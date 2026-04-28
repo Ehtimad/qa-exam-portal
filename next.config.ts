@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@libsql/client", "bcryptjs"],
+  serverExternalPackages: ["bcryptjs"],
 };
 
 export default nextConfig;

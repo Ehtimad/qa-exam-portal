@@ -39,17 +39,6 @@ export async function POST(req: NextRequest) {
     numericAnswers[parseInt(key)] = val;
   }
 
-  // Validate all questions answered
-  const unanswered = questions.filter(
-    (q) => !(numericAnswers[q.id]?.length)
-  );
-  if (unanswered.length > 0) {
-    return NextResponse.json(
-      { error: `${unanswered.length} sual cavabsız qalıb` },
-      { status: 400 }
-    );
-  }
-
   const { score, correct } = calculateScore(numericAnswers);
 
   await db.insert(examAttempts).values({

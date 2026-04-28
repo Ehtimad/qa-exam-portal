@@ -1,9 +1,9 @@
 /**
  * Run: npx tsx scripts/seed-admin.ts
- * Creates the first admin user. Set env vars first.
+ * Creates the first admin user. Set DATABASE_URL env var first.
  */
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "../lib/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
@@ -13,11 +13,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "Admin@123";
 const ADMIN_NAME = process.env.ADMIN_NAME ?? "Admin";
 
 async function main() {
-  const client = createClient({
-    url: process.env.TURSO_DATABASE_URL ?? "file:local.db",
-    authToken: process.env.TURSO_AUTH_TOKEN,
-  });
-  const db = drizzle(client, { schema });
+  const sql = neon(process.env.DATABASE_URL!);
+  const db = drizzle(sql, { schema });
 
   const [existing] = await db
     .select({ id: schema.users.id })

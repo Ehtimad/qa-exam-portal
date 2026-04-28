@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, examAttempts } from "@/lib/schema";
-import { eq, count, sql } from "drizzle-orm";
+import { eq, count, sql, and } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -18,7 +18,7 @@ export default async function AdminPage() {
   const [pendingStudents] = await db
     .select({ count: count() })
     .from(users)
-    .where(sql`${users.role} = 'student' AND ${users.approved} = 0`);
+    .where(and(eq(users.role, "student"), eq(users.approved, false)));
 
   const [totalAttempts] = await db
     .select({ count: count() })
