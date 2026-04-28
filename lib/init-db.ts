@@ -79,8 +79,8 @@ export async function initDatabase() {
     const id = crypto.randomUUID();
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD ?? "Admin@123", 12);
     await sql`
-      INSERT INTO users (id, name, email, password, role, approved)
-      VALUES (${id}, ${process.env.ADMIN_NAME ?? "Admin"}, ${process.env.ADMIN_EMAIL ?? "admin@exam.local"}, ${hash}, 'admin', true)
+      INSERT INTO users (id, name, email, password, role)
+      VALUES (${id}, ${process.env.ADMIN_NAME ?? "Admin"}, ${process.env.ADMIN_EMAIL ?? "admin@exam.local"}, ${hash}, 'admin')
     `;
     console.log("[init-db] Admin yaradıldı: admin@exam.local / Admin@123");
   }
