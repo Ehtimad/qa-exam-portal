@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -80,28 +81,20 @@ export default function RegisterPage() {
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Şifrə</label>
-              <input
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="input-field"
-                placeholder="Ən az 6 simvol"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Şifrəni təsdiqlə</label>
-              <input
-                type="password"
-                value={form.confirm}
-                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                className="input-field"
-                placeholder="Şifrəni təkrar daxil et"
-                required
-              />
-            </div>
+            <PasswordInput
+              label="Şifrə"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Ən az 6 simvol"
+              required
+            />
+            <PasswordInput
+              label="Şifrəni təsdiqlə"
+              value={form.confirm}
+              onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+              placeholder="Şifrəni təkrar daxil et"
+              required
+            />
             <button
               type="submit"
               disabled={loading}

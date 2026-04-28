@@ -32,6 +32,11 @@ export default async function DashboardPage() {
           </Link>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">{session.user.name}</span>
+            {session.user.role === "admin" && (
+              <Link href="/admin" className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition-colors">
+                Admin Panel
+              </Link>
+            )}
             <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
               <button type="submit" className="btn-secondary text-sm py-1.5 px-3">
                 Çıxış

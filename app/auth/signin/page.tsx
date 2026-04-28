@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -69,19 +70,13 @@ export default function SignInPage() {
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Şifrə
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+            <PasswordInput
+              label="Şifrə"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
             <button
               type="submit"
               disabled={loading}

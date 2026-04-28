@@ -26,7 +26,7 @@ export const authConfig = {
       ) {
         return Response.redirect(new URL("/auth/signin", nextUrl));
       }
-      if (path.startsWith("/exam") && isLoggedIn && !isApproved) {
+      if (path.startsWith("/exam") && isLoggedIn && !isApproved && !isAdmin) {
         return Response.redirect(new URL("/dashboard", nextUrl));
       }
       if (path.startsWith("/auth/") && isLoggedIn) {

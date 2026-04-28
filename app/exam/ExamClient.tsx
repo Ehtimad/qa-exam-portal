@@ -203,7 +203,10 @@ export default function ExamClient({ questions, userId }: Props) {
               </div>
             </div>
 
-            <div className="flex items-baseline gap-2 mt-3 mb-5">
+            <div
+              className="flex items-baseline gap-2 mt-3 mb-5 select-none"
+              onCopy={(e) => e.preventDefault()}
+            >
               <span className="text-lg font-semibold text-gray-400 min-w-[2rem]">
                 {current + 1}.
               </span>
@@ -218,7 +221,7 @@ export default function ExamClient({ questions, userId }: Props) {
               </p>
             )}
 
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 select-none" onCopy={(e) => e.preventDefault()}>
               {question.options.map((option, idx) => {
                 const isSelected = answered.includes(idx);
                 return (

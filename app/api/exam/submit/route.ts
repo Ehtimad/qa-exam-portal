@@ -18,12 +18,12 @@ export async function POST(req: NextRequest) {
   }
 
   const [user] = await db
-    .select({ approved: users.approved })
+    .select({ approved: users.approved, role: users.role })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
 
-  if (!user?.approved) {
+  if (!user?.approved && user?.role !== "admin") {
     return NextResponse.json({ error: "Hesab təsdiq edilməyib" }, { status: 403 });
   }
 
