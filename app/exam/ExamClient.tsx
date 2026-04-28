@@ -26,7 +26,6 @@ export default function ExamClient({ questions, userId }: Props) {
   const [current, setCurrent] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [showValidation, setShowValidation] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -37,8 +36,6 @@ export default function ExamClient({ questions, userId }: Props) {
   const question = questions[current];
   const answered = answers[question.id] ?? [];
   const answeredCount = Object.keys(answers).length;
-  const unanswered = questions.filter((q) => !(answers[q.id]?.length));
-
   function toggleAnswer(idx: number) {
     setAnswers((prev) => {
       const cur = prev[question.id] ?? [];
@@ -53,10 +50,6 @@ export default function ExamClient({ questions, userId }: Props) {
   }
 
   async function handleSubmit() {
-    if (unanswered.length > 0) {
-      setShowValidation(true);
-      return;
-    }
     setSubmitting(true);
     setSubmitError("");
 
@@ -75,15 +68,6 @@ export default function ExamClient({ questions, userId }: Props) {
       const d = await res.json();
       setSubmitError(d.error ?? "Göndərmə xətası");
       setSubmitting(false);
-    }
-  }
-
-  function jumpToUnanswered() {
-    const first = unanswered[0];
-    if (first) {
-      const idx = questions.findIndex((q) => q.id === first.id);
-      setCurrent(idx);
-      setShowValidation(false);
     }
   }
 
@@ -125,22 +109,6 @@ export default function ExamClient({ questions, userId }: Props) {
           </div>
         </div>
       </header>
-
-      {showValidation && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-3">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <p className="text-red-700 text-sm font-medium">
-              {unanswered.length} sual cavabsız qalıb. Bitirmək üçün bütün sualları cavablandırın.
-            </p>
-            <button
-              onClick={jumpToUnanswered}
-              className="text-red-700 text-sm underline hover:no-underline ml-4"
-            >
-              İlk cavabsıza keç →
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="max-w-6xl mx-auto w-full px-4 py-6 flex gap-6 flex-1">
         {/* Question navigator sidebar */}
