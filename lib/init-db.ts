@@ -55,12 +55,11 @@ let initialized = false;
 export async function initDatabase() {
   if (initialized) return;
 
-  const url = process.env.TURSO_DATABASE_URL ?? "file:/tmp/local.db";
-  // Only auto-init for local file databases
-  if (!url.startsWith("file:")) {
-    initialized = true;
-    return;
-  }
+  const rawUrl = process.env.TURSO_DATABASE_URL ?? "";
+  const url =
+    !rawUrl || (rawUrl.startsWith("file:") && !rawUrl.startsWith("file:/tmp"))
+      ? "file:/tmp/local.db"
+      : rawUrl;
 
   const client = createClient({
     url,
