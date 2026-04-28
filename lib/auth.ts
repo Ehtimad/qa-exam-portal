@@ -7,19 +7,16 @@ import { users, accounts, sessions, verificationTokens } from "./schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { authConfig } from "@/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
   }),
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/signin",
-  },
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
@@ -54,7 +51,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user || !user.password) return null;
 
-        const valid = await bcrypt.compare(parsed.data.password, user.password);
+        const valid = await bcrypt.compare(
+          parsed.data.password,
+          user.password
+        );
         if (!valid) return null;
 
         return {
@@ -69,12 +69,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as { role: string }).role;
-        token.approved = (user as { approved: boolean }).approved;
+        token.role = (user as { role?: string }).role;
+        token.approved = (user as { approved?: boolean }).approved;
       }
+      // Refresh approved status from DB when session updates
       if (trigger === "update" && token.id) {
         const [fresh] = await db
           .select({ role: users.role, approved: users.approved })
