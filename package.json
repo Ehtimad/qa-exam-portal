@@ -16,7 +16,7 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.4",
     "@libsql/client": "^0.14.0",
-    "@neondatabase/serverless": "^1.1.0",
+    "@neondatabase/serverless": "^0.10.4",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.38.4",
