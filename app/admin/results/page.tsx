@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MAX_SCORE } from "@/lib/questions";
+import { ResetButton } from "./ResetButton";
 
 export default async function AdminResultsPage() {
   const session = await auth();
@@ -31,10 +32,7 @@ export default async function AdminResultsPage() {
     results.length > 0
       ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
       : 0;
-
-  const passCount = results.filter(
-    (r) => (r.score / r.maxScore) * 100 >= 70
-  ).length;
+  const passCount = results.filter((r) => (r.score / r.maxScore) * 100 >= 70).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -78,6 +76,7 @@ export default async function AdminResultsPage() {
                     <th className="text-right py-3 text-gray-500 font-medium">Müddət</th>
                     <th className="text-center py-3 text-gray-500 font-medium">Nəticə</th>
                     <th className="text-right py-3 text-gray-500 font-medium">Tarix</th>
+                    <th className="text-right py-3 text-gray-500 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -106,21 +105,28 @@ export default async function AdminResultsPage() {
                             {pct}%
                           </span>
                         </td>
-                        <td className="py-3 text-right text-gray-600">
-                          {r.correctAnswers}/100
-                        </td>
+                        <td className="py-3 text-right text-gray-600">{r.correctAnswers}/100</td>
                         <td className="py-3 text-right text-gray-500">{dur}</td>
                         <td className="py-3 text-center">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            passed
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-600"
+                            passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
                           }`}>
                             {passed ? "Keçdi" : "Kəsildi"}
                           </span>
                         </td>
                         <td className="py-3 text-right text-gray-500 text-xs">
                           {new Date(r.completedAt).toLocaleString("az-AZ")}
+                        </td>
+                        <td className="py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={`/admin/results/${r.id}`}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50"
+                            >
+                              Detallı
+                            </Link>
+                            <ResetButton attemptId={r.id} />
+                          </div>
                         </td>
                       </tr>
                     );

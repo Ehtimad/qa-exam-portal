@@ -62,7 +62,8 @@ export default function ExamClient({ questions, userId }: Props) {
     });
 
     if (res.ok) {
-      router.push("/dashboard");
+      const data = await res.json();
+      router.push(`/dashboard/results/${data.attemptId}`);
       router.refresh();
     } else {
       const d = await res.json();

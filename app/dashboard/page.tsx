@@ -18,10 +18,8 @@ export default async function DashboardPage() {
     .orderBy(desc(examAttempts.completedAt))
     .limit(10);
 
-  const bestScore = attempts.length
-    ? Math.max(...attempts.map((a) => a.score))
-    : 0;
-  const lastAttempt = attempts[0] ?? null;
+  const hasAttempt = attempts.length > 0;
+  const bestScore = hasAttempt ? Math.max(...attempts.map((a) => a.score)) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -32,6 +30,9 @@ export default async function DashboardPage() {
           </Link>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">{session.user.name}</span>
+            <Link href="/profile" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              Məlumatlarım
+            </Link>
             {session.user.role === "admin" && (
               <Link href="/admin" className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition-colors">
                 Admin Panel
@@ -47,10 +48,7 @@ export default async function DashboardPage() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          Şəxsi Kabinet
-        </h1>
-
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Şəxsi Kabinet</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="card text-center">
@@ -70,25 +68,30 @@ export default async function DashboardPage() {
         <div className="card mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">İmtahana başla</h2>
+              <h2 className="text-lg font-semibold text-gray-900">İmtahan</h2>
               <p className="text-gray-500 text-sm mt-1">
                 100 sual • 7 mühazirə • Maksimum {MAX_SCORE} bal
               </p>
             </div>
-            <Link href="/exam" className="btn-primary">
-              İmtahana başla →
-            </Link>
+            {hasAttempt ? (
+              <div className="text-right">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-500">
+                  İştirak etdiniz
+                </span>
+                <p className="text-xs text-gray-400 mt-1">Yenidən iştirak mümkün deyil</p>
+              </div>
+            ) : (
+              <Link href="/exam" className="btn-primary">
+                İmtahana başla →
+              </Link>
+            )}
           </div>
         </div>
 
         <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Keçmiş nəticələr
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Keçmiş nəticələr</h2>
           {attempts.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">
-              Hələ heç bir imtahan verməmisiniz
-            </p>
+            <p className="text-gray-500 text-sm text-center py-8">Hələ heç bir imtahan verməmisiniz</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -99,6 +102,7 @@ export default async function DashboardPage() {
                     <th className="text-right py-2 text-gray-500 font-medium">Faiz</th>
                     <th className="text-right py-2 text-gray-500 font-medium">Düzgün</th>
                     <th className="text-right py-2 text-gray-500 font-medium">Müddət</th>
+                    <th className="text-right py-2 text-gray-500 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,6 +128,14 @@ export default async function DashboardPage() {
                           {attempt.correctAnswers}/100
                         </td>
                         <td className="py-3 text-right text-gray-500">{dur}</td>
+                        <td className="py-3 text-right">
+                          <Link
+                            href={`/dashboard/results/${attempt.id}`}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Detallı bax →
+                          </Link>
+                        </td>
                       </tr>
                     );
                   })}

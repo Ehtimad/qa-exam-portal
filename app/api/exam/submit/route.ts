@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { examAttempts } from "@/lib/schema";
 import { calculateScore, questions, MAX_SCORE } from "@/lib/questions";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 const schema = z.object({
@@ -16,13 +17,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const [existing] = await db
+    .select({ id: examAttempts.id })
+    .from(examAttempts)
+    .where(eq(examAttempts.userId, session.user.id))
+    .limit(1);
+
+  if (existing) {
+    return NextResponse.json({ error: "Siz artıq imtahanda iştirak etmisiniz" }, { status: 409 });
+  }
+
   const body = await req.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Yanlış məlumat formatı" }, { status: 400 });
   }
 
-  // Convert string keys back to number keys for calculateScore
   const numericAnswers: Record<number, number[]> = {};
   for (const [key, val] of Object.entries(parsed.data.answers)) {
     numericAnswers[parseInt(key)] = val;
@@ -30,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { score, correct } = calculateScore(numericAnswers);
 
-  await db.insert(examAttempts).values({
+  const [inserted] = await db.insert(examAttempts).values({
     userId: session.user.id,
     answers: JSON.stringify(parsed.data.answers),
     score,
@@ -38,7 +48,7 @@ export async function POST(req: NextRequest) {
     totalQuestions: questions.length,
     correctAnswers: correct,
     duration: parsed.data.duration,
-  });
+  }).returning({ id: examAttempts.id });
 
-  return NextResponse.json({ score, maxScore: MAX_SCORE, correct }, { status: 201 });
+  return NextResponse.json({ score, maxScore: MAX_SCORE, correct, attemptId: inserted.id }, { status: 201 });
 }

@@ -19,7 +19,8 @@ export const authConfig = {
       if (
         (path.startsWith("/dashboard") ||
           path.startsWith("/exam") ||
-          path.startsWith("/results")) &&
+          path.startsWith("/results") ||
+          path.startsWith("/profile")) &&
         !isLoggedIn
       ) {
         return Response.redirect(new URL("/auth/signin", nextUrl));

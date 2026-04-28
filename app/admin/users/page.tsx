@@ -4,6 +4,7 @@ import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { UserRow } from "./UserActions";
 
 export default async function AdminUsersPage() {
   const session = await auth();
@@ -27,9 +28,7 @@ export default async function AdminUsersPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Tələbələr</h1>
-          <div className="text-sm text-gray-500">
-            Cəmi: {allStudents.length} tələbə
-          </div>
+          <div className="text-sm text-gray-500">Cəmi: {allStudents.length} tələbə</div>
         </div>
 
         <div className="card">
@@ -44,22 +43,12 @@ export default async function AdminUsersPage() {
                     <th className="text-left py-3 text-gray-500 font-medium">Qrup</th>
                     <th className="text-left py-3 text-gray-500 font-medium">E-poçt</th>
                     <th className="text-left py-3 text-gray-500 font-medium">Qeydiyyat tarixi</th>
+                    <th className="text-right py-3 text-gray-500 font-medium">Əməliyyatlar</th>
                   </tr>
                 </thead>
                 <tbody>
                   {allStudents.map((student) => (
-                    <tr key={student.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="py-3 font-medium text-gray-900">{student.name ?? "–"}</td>
-                      <td className="py-3">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                          {student.groupName ?? "–"}
-                        </span>
-                      </td>
-                      <td className="py-3 text-gray-600">{student.email}</td>
-                      <td className="py-3 text-gray-500">
-                        {new Date(student.createdAt).toLocaleDateString("az-AZ")}
-                      </td>
-                    </tr>
+                    <UserRow key={student.id} student={student} />
                   ))}
                 </tbody>
               </table>
