@@ -5,16 +5,32 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { UserRow } from "./UserActions";
+import { Suspense } from "react";
+import UsersFilterBar from "./UsersFilterBar";
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; group?: string }>;
+}) {
   const session = await auth();
   if (!session || session.user.role !== "admin") redirect("/dashboard");
+
+  const { q = "", group = "" } = await searchParams;
 
   const allStudents = await db
     .select()
     .from(users)
     .where(eq(users.role, "student"))
     .orderBy(users.createdAt);
+
+  const groups = [...new Set(allStudents.map((s) => s.groupName).filter(Boolean))] as string[];
+
+  const filtered = allStudents.filter((s) => {
+    const matchQ = !q || (s.name?.toLowerCase().includes(q.toLowerCase()) || s.email.toLowerCase().includes(q.toLowerCase()));
+    const matchGroup = !group || s.groupName === group;
+    return matchQ && matchGroup;
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -26,14 +42,22 @@ export default async function AdminUsersPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-900">Tələbələr</h1>
-          <div className="text-sm text-gray-500">Cəmi: {allStudents.length} tələbə</div>
+          <div className="text-sm text-gray-500">
+            {filtered.length} / {allStudents.length} tələbə
+          </div>
         </div>
 
+        <Suspense>
+          <UsersFilterBar groups={groups} />
+        </Suspense>
+
         <div className="card">
-          {allStudents.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">Hələ heç bir tələbə yoxdur</p>
+          {filtered.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-8">
+              {allStudents.length === 0 ? "Hələ heç bir tələbə yoxdur" : "Filter nəticəsi tapılmadı"}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -47,7 +71,7 @@ export default async function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {allStudents.map((student) => (
+                  {filtered.map((student) => (
                     <UserRow key={student.id} student={student} />
                   ))}
                 </tbody>

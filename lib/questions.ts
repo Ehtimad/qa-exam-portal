@@ -1261,12 +1261,13 @@ export const questions: Question[] = [
   },
 ];
 
-export const MAX_SCORE = questions.reduce((sum, q) => sum + q.points, 0);
+const RAW_MAX = questions.reduce((sum, q) => sum + q.points, 0);
+export const MAX_SCORE = 500;
 
 export function calculateScore(
   answers: Record<number, number[]>
 ): { score: number; correct: number } {
-  let score = 0;
+  let rawScore = 0;
   let correct = 0;
   for (const question of questions) {
     const given = (answers[question.id] ?? []).slice().sort((a,b)=>a-b);
@@ -1275,9 +1276,10 @@ export function calculateScore(
       given.length === expected.length &&
       given.every((v, i) => v === expected[i]);
     if (isCorrect) {
-      score += question.points;
+      rawScore += question.points;
       correct++;
     }
   }
+  const score = Math.round(rawScore * MAX_SCORE / RAW_MAX);
   return { score, correct };
 }

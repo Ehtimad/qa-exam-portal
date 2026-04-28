@@ -16,7 +16,6 @@ export default async function Home() {
             </svg>
           </div>
           <h1 className="text-4xl font-bold text-white mb-3">QA Online Exam Portal</h1>
-          <p className="text-blue-200 text-lg mb-2">ISTQB Formatında QA Manual İmtahan Sistemi</p>
           <p className="text-blue-300 text-sm">7 Mühazirə • 100 Sual • 500 Bal</p>
         </div>
 
@@ -47,10 +46,6 @@ export default async function Home() {
             Daxil ol
           </Link>
         </div>
-
-        <p className="text-blue-300 text-sm mt-6">
-          Qeydiyyatdan sonra Admin təsdiqindən keçməlisiniz
-        </p>
       </div>
     </main>
   );

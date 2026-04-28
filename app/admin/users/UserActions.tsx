@@ -15,6 +15,7 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
   const [groupName, setGroupName] = useState(user.groupName ?? "");
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,7 +25,7 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
     const res = await fetch(`/api/admin/users/${user.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, groupName }),
+      body: JSON.stringify({ name, email, groupName, newPassword: newPassword || undefined }),
     });
     setLoading(false);
     if (res.ok) {
@@ -69,20 +70,27 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Yeni şifrə <span className="text-gray-400 font-normal">(istəyə bağlı)</span>
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Boş buraxılsa dəyişdirilməz"
+              minLength={6}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
           {error && <p className="text-red-600 text-sm">{error}</p>}
         </div>
 
         <div className="flex gap-3 mt-6">
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="btn-primary flex-1"
-          >
+          <button onClick={handleSave} disabled={loading} className="btn-primary flex-1">
             {loading ? "Saxlanılır..." : "Saxla"}
           </button>
-          <button onClick={onClose} className="btn-secondary flex-1">
-            Ləğv et
-          </button>
+          <button onClick={onClose} className="btn-secondary flex-1">Ləğv et</button>
         </div>
       </div>
     </div>

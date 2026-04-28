@@ -4,14 +4,21 @@ import { examAttempts, users } from "@/lib/schema";
 import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MAX_SCORE } from "@/lib/questions";
 import { ResetButton } from "./ResetButton";
+import { Suspense } from "react";
+import ResultsFilterBar from "./ResultsFilterBar";
 
-export default async function AdminResultsPage() {
+export default async function AdminResultsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; group?: string; result?: string }>;
+}) {
   const session = await auth();
   if (!session || session.user.role !== "admin") redirect("/dashboard");
 
-  const results = await db
+  const { q = "", group = "", result = "" } = await searchParams;
+
+  const allResults = await db
     .select({
       id: examAttempts.id,
       score: examAttempts.score,
@@ -28,10 +35,20 @@ export default async function AdminResultsPage() {
     .leftJoin(users, eq(examAttempts.userId, users.id))
     .orderBy(sql`${examAttempts.completedAt} DESC`);
 
-  const avgScore =
-    results.length > 0
-      ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
-      : 0;
+  const groups = [...new Set(allResults.map((r) => r.userGroup).filter(Boolean))] as string[];
+
+  const results = allResults.filter((r) => {
+    const pct = (r.score / r.maxScore) * 100;
+    const passed = pct >= 70;
+    const matchQ = !q || ((r.userName?.toLowerCase().includes(q.toLowerCase())) || (r.userEmail?.toLowerCase().includes(q.toLowerCase())));
+    const matchGroup = !group || r.userGroup === group;
+    const matchResult = !result || (result === "pass" ? passed : !passed);
+    return matchQ && matchGroup && matchResult;
+  });
+
+  const avgScore = results.length > 0
+    ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
+    : 0;
   const passCount = results.filter((r) => (r.score / r.maxScore) * 100 >= 70).length;
 
   return (
@@ -44,11 +61,14 @@ export default async function AdminResultsPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">İmtahan Nəticələri</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-gray-900">İmtahan Nəticələri</h1>
+          <div className="text-sm text-gray-500">{results.length} / {allResults.length} nəticə</div>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Ümumi cəhd", value: results.length, color: "blue" },
+            { label: "Göstərilən", value: results.length, color: "blue" },
             { label: "Orta bal", value: avgScore, color: "purple" },
             { label: "Keçən (≥70%)", value: passCount, color: "green" },
             { label: "Kəsilən", value: results.length - passCount, color: "red" },
@@ -60,9 +80,15 @@ export default async function AdminResultsPage() {
           ))}
         </div>
 
+        <Suspense>
+          <ResultsFilterBar groups={groups} />
+        </Suspense>
+
         <div className="card">
           {results.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">Hələ heç bir nəticə yoxdur</p>
+            <p className="text-gray-500 text-sm text-center py-8">
+              {allResults.length === 0 ? "Hələ heç bir nəticə yoxdur" : "Filter nəticəsi tapılmadı"}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
