@@ -7,7 +7,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "", groupName: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +28,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+      body: JSON.stringify({ name: form.name, email: form.email, password: form.password, groupName: form.groupName }),
     });
     const data = await res.json();
     setLoading(false);
@@ -71,6 +71,17 @@ export default function RegisterPage() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Qrup</label>
+              <input
+                type="text"
+                value={form.groupName}
+                onChange={(e) => setForm({ ...form, groupName: e.target.value })}
+                className="input-field"
+                placeholder="Məs: March-2024, QA-Group-1"
+                required
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">E-poçt</label>
               <input
                 type="email"
@@ -103,10 +114,6 @@ export default function RegisterPage() {
               {loading ? "Qeydiyyat..." : "Qeydiyyatdan keç"}
             </button>
           </form>
-
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            Qeydiyyatdan sonra Admin tərəfindən təsdiq gözlənilir.
-          </div>
         </div>
 
         <p className="text-center text-gray-500 text-sm mt-4">

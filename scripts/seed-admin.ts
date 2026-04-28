@@ -33,7 +33,6 @@ async function main() {
     email: ADMIN_EMAIL,
     password: hashed,
     role: "admin",
-    approved: true,
   });
 
   console.log(`Admin created: ${ADMIN_EMAIL}`);

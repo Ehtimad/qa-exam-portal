@@ -48,7 +48,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           image: user.image,
           role: user.role,
-          approved: user.approved,
+          groupName: user.groupName,
         };
       },
     }),
@@ -59,19 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
-        token.approved = (user as { approved?: boolean }).approved;
-      }
-      // Refresh approved status from DB when session updates
-      if (trigger === "update" && token.id) {
-        const [fresh] = await db
-          .select({ role: users.role, approved: users.approved })
-          .from(users)
-          .where(eq(users.id, token.id as string))
-          .limit(1);
-        if (fresh) {
-          token.role = fresh.role;
-          token.approved = fresh.approved;
-        }
+        token.groupName = (user as { groupName?: string }).groupName;
       }
       return token;
     },
@@ -79,7 +67,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
-        session.user.approved = token.approved as boolean;
+        session.user.groupName = token.groupName as string;
       }
       return session;
     },
@@ -89,7 +77,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 declare module "next-auth" {
   interface User {
     role?: string;
-    approved?: boolean;
+    groupName?: string | null;
   }
   interface Session {
     user: {
@@ -98,7 +86,7 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       role: string;
-      approved: boolean;
+      groupName?: string | null;
     };
   }
 }

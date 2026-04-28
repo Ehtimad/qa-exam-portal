@@ -11,8 +11,6 @@ export const authConfig = {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const isAdmin = auth?.user?.role === "admin";
-      const isApproved = auth?.user?.approved;
-
       const path = nextUrl.pathname;
 
       if (path.startsWith("/admin") && !isAdmin) {
@@ -26,9 +24,6 @@ export const authConfig = {
       ) {
         return Response.redirect(new URL("/auth/signin", nextUrl));
       }
-      if (path.startsWith("/exam") && isLoggedIn && !isApproved && !isAdmin) {
-        return Response.redirect(new URL("/dashboard", nextUrl));
-      }
       if (path.startsWith("/auth/") && isLoggedIn) {
         return Response.redirect(new URL("/dashboard", nextUrl));
       }
@@ -38,7 +33,6 @@ export const authConfig = {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
-        token.approved = (user as { approved?: boolean }).approved;
       }
       return token;
     },
@@ -46,7 +40,6 @@ export const authConfig = {
       if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
-        session.user.approved = token.approved as boolean;
       }
       return session;
     },

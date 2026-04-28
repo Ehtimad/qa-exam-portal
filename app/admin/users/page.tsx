@@ -4,7 +4,6 @@ import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import ApproveButton from "./ApproveButton";
 
 export default async function AdminUsersPage() {
   const session = await auth();
@@ -29,8 +28,7 @@ export default async function AdminUsersPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Tələbələr</h1>
           <div className="text-sm text-gray-500">
-            {allStudents.filter((u) => !u.approved).length} gözləyir •{" "}
-            {allStudents.filter((u) => u.approved).length} təsdiq edilib
+            Cəmi: {allStudents.length} tələbə
           </div>
         </div>
 
@@ -43,34 +41,23 @@ export default async function AdminUsersPage() {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left py-3 text-gray-500 font-medium">Ad Soyad</th>
+                    <th className="text-left py-3 text-gray-500 font-medium">Qrup</th>
                     <th className="text-left py-3 text-gray-500 font-medium">E-poçt</th>
                     <th className="text-left py-3 text-gray-500 font-medium">Qeydiyyat tarixi</th>
-                    <th className="text-center py-3 text-gray-500 font-medium">Giriş</th>
-                    <th className="text-center py-3 text-gray-500 font-medium">Əməliyyat</th>
                   </tr>
                 </thead>
                 <tbody>
                   {allStudents.map((student) => (
                     <tr key={student.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-3 font-medium text-gray-900">{student.name ?? "–"}</td>
+                      <td className="py-3">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                          {student.groupName ?? "–"}
+                        </span>
+                      </td>
                       <td className="py-3 text-gray-600">{student.email}</td>
                       <td className="py-3 text-gray-500">
                         {new Date(student.createdAt).toLocaleDateString("az-AZ")}
-                      </td>
-                      <td className="py-3 text-center">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          student.approved
-                            ? "bg-green-100 text-green-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}>
-                          {student.approved ? "Təsdiqlənib" : "Gözləyir"}
-                        </span>
-                      </td>
-                      <td className="py-3 text-center">
-                        <ApproveButton
-                          userId={student.id}
-                          approved={student.approved}
-                        />
                       </td>
                     </tr>
                   ))}

@@ -21,10 +21,13 @@ export async function initDatabase() {
       image TEXT,
       password TEXT,
       role TEXT NOT NULL DEFAULT 'student',
-      approved BOOLEAN NOT NULL DEFAULT false,
+      group_name TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  // Migrate existing tables: add new columns if they don't exist
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS group_name TEXT`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS accounts (
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { examAttempts, users } from "@/lib/schema";
+import { examAttempts } from "@/lib/schema";
 import { calculateScore, questions, MAX_SCORE } from "@/lib/questions";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 const schema = z.object({
@@ -15,16 +14,6 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const [user] = await db
-    .select({ approved: users.approved, role: users.role })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-
-  if (!user?.approved && user?.role !== "admin") {
-    return NextResponse.json({ error: "Hesab təsdiq edilməyib" }, { status: 403 });
   }
 
   const body = await req.json();

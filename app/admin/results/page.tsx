@@ -21,6 +21,7 @@ export default async function AdminResultsPage() {
       completedAt: examAttempts.completedAt,
       userName: users.name,
       userEmail: users.email,
+      userGroup: users.groupName,
     })
     .from(examAttempts)
     .leftJoin(users, eq(examAttempts.userId, users.id))
@@ -70,6 +71,7 @@ export default async function AdminResultsPage() {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left py-3 text-gray-500 font-medium">Tələbə</th>
+                    <th className="text-left py-3 text-gray-500 font-medium">Qrup</th>
                     <th className="text-right py-3 text-gray-500 font-medium">Bal</th>
                     <th className="text-right py-3 text-gray-500 font-medium">Faiz</th>
                     <th className="text-right py-3 text-gray-500 font-medium">Düzgün</th>
@@ -90,6 +92,11 @@ export default async function AdminResultsPage() {
                         <td className="py-3">
                           <div className="font-medium text-gray-900">{r.userName ?? "–"}</div>
                           <div className="text-gray-400 text-xs">{r.userEmail}</div>
+                        </td>
+                        <td className="py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                            {r.userGroup ?? "–"}
+                          </span>
                         </td>
                         <td className="py-3 text-right font-semibold text-blue-600">
                           {r.score}/{r.maxScore}

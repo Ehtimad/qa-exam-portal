@@ -9,6 +9,7 @@ const schema = z.object({
   name: z.string().min(2).max(100),
   email: z.string().email(),
   password: z.string().min(6).max(100),
+  groupName: z.string().min(1).max(100),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, groupName } = parsed.data;
 
   const [existing] = await db
     .select({ id: users.id })
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     email,
     password: hashed,
     role: "student",
-    approved: false,
+    groupName,
   });
 
   return NextResponse.json({ success: true }, { status: 201 });

@@ -51,21 +51,6 @@ export default async function DashboardPage() {
           Şəxsi Kabinet
         </h1>
 
-        {!session.user.approved && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <h3 className="font-semibold text-amber-800">Hesabınız gözləmə vəziyyətindədir</h3>
-                <p className="text-amber-700 text-sm mt-1">
-                  Admin tərəfindən təsdiq edildikdən sonra imtahana başlaya bilərsiniz.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="card text-center">
@@ -82,21 +67,19 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {session.user.approved && (
-          <div className="card mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">İmtahana başla</h2>
-                <p className="text-gray-500 text-sm mt-1">
-                  100 sual • 7 mühazirə • Maksimum {MAX_SCORE} bal
-                </p>
-              </div>
-              <Link href="/exam" className="btn-primary">
-                İmtahana başla →
-              </Link>
+        <div className="card mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">İmtahana başla</h2>
+              <p className="text-gray-500 text-sm mt-1">
+                100 sual • 7 mühazirə • Maksimum {MAX_SCORE} bal
+              </p>
             </div>
+            <Link href="/exam" className="btn-primary">
+              İmtahana başla →
+            </Link>
           </div>
-        )}
+        </div>
 
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">

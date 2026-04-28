@@ -16,7 +16,7 @@ export const users = pgTable("users", {
   image: text("image"),
   password: text("password"),
   role: text("role").notNull().default("student"),
-  approved: boolean("approved").notNull().default(false),
+  groupName: text("group_name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, examAttempts } from "@/lib/schema";
-import { eq, count, sql, and } from "drizzle-orm";
+import { eq, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -15,10 +15,6 @@ export default async function AdminPage() {
     .from(users)
     .where(eq(users.role, "student"));
 
-  const [pendingStudents] = await db
-    .select({ count: count() })
-    .from(users)
-    .where(and(eq(users.role, "student"), eq(users.approved, false)));
 
   const [totalAttempts] = await db
     .select({ count: count() })
@@ -64,13 +60,12 @@ export default async function AdminPage() {
             <div className="text-gray-500 text-sm mt-1">Ümumi tələbə</div>
           </div>
           <div className="card text-center">
-            <div className="text-3xl font-bold text-amber-500">{pendingStudents.count}</div>
-            <div className="text-gray-500 text-sm mt-1">Gözləyən tələbə</div>
-            {pendingStudents.count > 0 && (
-              <Link href="/admin/users" className="text-xs text-blue-600 hover:underline mt-1 block">
-                Təsdiq et →
-              </Link>
-            )}
+            <div className="text-3xl font-bold text-blue-600">
+              <Link href="/admin/users" className="hover:underline">{totalStudents.count}</Link>
+            </div>
+            <div className="text-gray-500 text-sm mt-1">
+              <Link href="/admin/users" className="hover:underline">Tələbə siyahısı →</Link>
+            </div>
           </div>
           <div className="card text-center">
             <div className="text-3xl font-bold text-green-600">{totalAttempts.count}</div>
