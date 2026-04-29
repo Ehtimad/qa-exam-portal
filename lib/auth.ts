@@ -82,8 +82,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Block check
         if (user.isBlocked) return null;
 
-        // Email verification check (new accounts — must be verified by admin)
-        if (!user.emailVerified) return null;
+        // Email verification check — admin always bypasses, students must be verified
+        if (user.role !== "admin" && !user.emailVerified) return null;
 
         return {
           id: user.id,
