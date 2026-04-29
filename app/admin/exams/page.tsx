@@ -45,6 +45,7 @@ export default async function AdminExamsPage() {
           <Link href="/admin/results" className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
           <Link href="/admin/questions" className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
           <Link href="/admin/analytics" className="text-sm text-gray-500 hover:text-gray-900">Analitika</Link>
+          <Link href="/admin/groups" className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
         </div>
       </nav>
       <div className="max-w-6xl mx-auto px-4 py-8">

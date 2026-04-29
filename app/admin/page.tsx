@@ -47,6 +47,7 @@ export default async function AdminPage() {
             <Link href="/admin/questions" className="text-sm text-gray-600 hover:text-gray-900">Suallar</Link>
             <Link href="/admin/exams" className="text-sm text-gray-600 hover:text-gray-900">İmtahanlar</Link>
             <Link href="/admin/analytics" className="text-sm text-gray-600 hover:text-gray-900">Analitika</Link>
+            <Link href="/admin/groups" className="text-sm text-gray-600 hover:text-gray-900">Qruplar</Link>
           </div>
           <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
             <button type="submit" className="btn-secondary text-sm py-1.5 px-3">Çıxış</button>
