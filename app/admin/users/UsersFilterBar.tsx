@@ -3,7 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
-export default function UsersFilterBar({ groups }: { groups: string[] }) {
+interface Group { id: string; name: string; }
+
+export default function UsersFilterBar({ groups }: { groups: Group[] }) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -33,8 +35,18 @@ export default function UsersFilterBar({ groups }: { groups: string[] }) {
       >
         <option value="">Bütün qruplar</option>
         {groups.map((g) => (
-          <option key={g} value={g}>{g}</option>
+          <option key={g.id} value={g.id}>{g.name}</option>
         ))}
+      </select>
+      <select
+        defaultValue={params.get("status") ?? ""}
+        onChange={(e) => update("status", e.target.value)}
+        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">Bütün statuslar</option>
+        <option value="pending">Gözləyir</option>
+        <option value="verified">Təsdiqlənmiş</option>
+        <option value="blocked">Bloklanmış</option>
       </select>
     </div>
   );

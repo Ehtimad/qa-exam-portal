@@ -2,8 +2,8 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "./db";
-import { users, accounts, sessions, verificationTokens } from "./schema";
-import { eq } from "drizzle-orm";
+import { users, accounts, sessions, verificationTokens, impersonationTokens } from "./schema";
+import { eq, and, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "@/auth.config";
@@ -19,10 +19,50 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email:              { label: "Email", type: "email" },
+        password:           { label: "Password", type: "password" },
+        impersonationToken: { label: "Impersonation Token", type: "text" },
       },
       async authorize(credentials) {
+        // ── Impersonation path ───────────────────────────────────────
+        if (credentials?.impersonationToken) {
+          const token = credentials.impersonationToken as string;
+          const [row] = await db
+            .select()
+            .from(impersonationTokens)
+            .where(
+              and(
+                eq(impersonationTokens.token, token),
+                gt(impersonationTokens.expiresAt, new Date())
+              )
+            )
+            .limit(1);
+
+          if (!row) return null;
+
+          // Consume token (one-time use)
+          await db.delete(impersonationTokens).where(eq(impersonationTokens.token, token));
+
+          const [target] = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, row.targetUserId))
+            .limit(1);
+
+          if (!target) return null;
+
+          return {
+            id: target.id,
+            name: target.name,
+            email: target.email,
+            image: target.image,
+            role: target.role,
+            groupId: target.groupId,
+            impersonatedBy: row.adminId,
+          } as never;
+        }
+
+        // ── Normal credentials path ──────────────────────────────────
         const parsed = z
           .object({ email: z.string().email(), password: z.string().min(6) })
           .safeParse(credentials);
@@ -36,11 +76,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user || !user.password) return null;
 
-        const valid = await bcrypt.compare(
-          parsed.data.password,
-          user.password
-        );
+        const valid = await bcrypt.compare(parsed.data.password, user.password);
         if (!valid) return null;
+
+        // Block check
+        if (user.isBlocked) return null;
+
+        // Email verification check (new accounts — must be verified by admin)
+        if (!user.emailVerified) return null;
 
         return {
           id: user.id,
@@ -48,8 +91,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           image: user.image,
           role: user.role,
-          groupName: user.groupName,
-        };
+          groupId: user.groupId,
+        } as never;
       },
     }),
   ],
@@ -59,7 +102,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
-        token.groupName = (user as { groupName?: string }).groupName;
+        token.groupId = (user as { groupId?: string }).groupId;
+        token.impersonatedBy = (user as { impersonatedBy?: string }).impersonatedBy;
       }
       return token;
     },
@@ -67,7 +111,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
-        session.user.groupName = token.groupName as string;
+        session.user.groupId = token.groupId as string | undefined;
+        session.user.impersonatedBy = token.impersonatedBy as string | undefined;
       }
       return session;
     },
@@ -77,7 +122,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 declare module "next-auth" {
   interface User {
     role?: string;
+    groupId?: string | null;
     groupName?: string | null;
+    impersonatedBy?: string | null;
   }
   interface Session {
     user: {
@@ -86,7 +133,9 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       role: string;
+      groupId?: string | null;
       groupName?: string | null;
+      impersonatedBy?: string | null;
     };
   }
 }

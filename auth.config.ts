@@ -1,6 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
 
-// Lightweight config for Edge middleware — no DB adapter here
 export const authConfig = {
   pages: {
     signIn: "/auth/signin",
@@ -25,8 +24,12 @@ export const authConfig = {
       ) {
         return Response.redirect(new URL("/auth/signin", nextUrl));
       }
+      // Redirect logged-in admin directly to /admin
+      if (path === "/dashboard" && isAdmin) {
+        return Response.redirect(new URL("/admin", nextUrl));
+      }
       if (path.startsWith("/auth/") && isLoggedIn) {
-        return Response.redirect(new URL("/dashboard", nextUrl));
+        return Response.redirect(new URL(isAdmin ? "/admin" : "/dashboard", nextUrl));
       }
       return true;
     },
@@ -34,6 +37,8 @@ export const authConfig = {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
+        token.groupId = (user as { groupId?: string }).groupId;
+        token.impersonatedBy = (user as { impersonatedBy?: string }).impersonatedBy;
       }
       return token;
     },
@@ -41,6 +46,8 @@ export const authConfig = {
       if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.groupId = token.groupId as string | undefined;
+        session.user.impersonatedBy = token.impersonatedBy as string | undefined;
       }
       return session;
     },

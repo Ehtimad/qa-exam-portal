@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/schema";
+import { users, groups } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -9,7 +9,7 @@ const schema = z.object({
   name: z.string().min(2).max(100),
   email: z.string().email(),
   password: z.string().min(6).max(100),
-  groupName: z.string().min(1).max(100),
+  groupId: z.string().min(1),
 });
 
 export async function POST(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
   }
 
-  const { name, email, password, groupName } = parsed.data;
+  const { name, email, password, groupId } = parsed.data;
 
   const [existing] = await db
     .select({ id: users.id })
@@ -32,6 +32,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Bu e-poçt artıq qeydiyyatdadır" }, { status: 409 });
   }
 
+  const [group] = await db
+    .select({ id: groups.id, name: groups.name })
+    .from(groups)
+    .where(eq(groups.id, groupId))
+    .limit(1);
+
+  if (!group) {
+    return NextResponse.json({ error: "Qrup tapılmadı" }, { status: 400 });
+  }
+
   const hashed = await bcrypt.hash(password, 12);
 
   await db.insert(users).values({
@@ -39,7 +49,9 @@ export async function POST(req: NextRequest) {
     email,
     password: hashed,
     role: "student",
-    groupName,
+    groupId: group.id,
+    groupName: group.name,
+    emailVerified: null,
   });
 
   return NextResponse.json({ success: true }, { status: 201 });

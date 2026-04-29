@@ -56,14 +56,27 @@ export default async function AdminResultsPage({
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center gap-6">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">← Admin</Link>
-          <span className="font-semibold text-gray-900">Bütün Nəticələr</span>
+          <span className="font-semibold text-gray-900">Nəticələr</span>
+          <Link href="/admin/users" className="text-sm text-gray-500 hover:text-gray-900">İstifadəçilər</Link>
+          <Link href="/admin/questions" className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
+          <Link href="/admin/exams" className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
+          <Link href="/admin/analytics" className="text-sm text-gray-500 hover:text-gray-900">Analitika</Link>
         </div>
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-900">İmtahan Nəticələri</h1>
-          <div className="text-sm text-gray-500">{results.length} / {allResults.length} nəticə</div>
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-500">{results.length} / {allResults.length} nəticə</div>
+            <a
+              href="/api/admin/export/results"
+              className="btn-secondary text-sm py-1.5 px-3"
+              download
+            >
+              Excel Export
+            </a>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">

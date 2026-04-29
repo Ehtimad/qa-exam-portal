@@ -1,31 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
+interface Group { id: string; name: string; }
 
 interface User {
   id: string;
   name: string | null;
   email: string;
   groupName: string | null;
+  groupId: string | null;
+  emailVerified: Date | string | null;
+  isBlocked: boolean;
+  createdAt: Date | string;
 }
 
 export function EditUserModal({ user, onClose }: { user: User; onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
-  const [groupName, setGroupName] = useState(user.groupName ?? "");
+  const [groupId, setGroupId] = useState(user.groupId ?? "");
   const [newPassword, setNewPassword] = useState("");
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    fetch("/api/groups").then((r) => r.json()).then(setGroups).catch(() => {});
+  }, []);
+
   async function handleSave() {
+    if (!groupId) { setError("Qrup seçin"); return; }
     setLoading(true);
     setError("");
     const res = await fetch(`/api/admin/users/${user.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, groupName, newPassword: newPassword || undefined }),
+      body: JSON.stringify({ name, email, groupId, newPassword: newPassword || undefined }),
     });
     setLoading(false);
     if (res.ok) {
@@ -45,43 +57,29 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ad Soyad</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">E-poçt</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Qrup</label>
-            <input
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Qrup seçin —</option>
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Yeni şifrə <span className="text-gray-400 font-normal">(istəyə bağlı)</span>
             </label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Boş buraxılsa dəyişdirilməz"
-              minLength={6}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Boş buraxılsa dəyişdirilməz" minLength={6}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           {error && <p className="text-red-600 text-sm">{error}</p>}
         </div>
@@ -97,10 +95,24 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
   );
 }
 
-export function UserRow({ student }: { student: User & { createdAt: Date | string } }) {
+export function UserRow({ student }: { student: User }) {
   const router = useRouter();
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const isVerified = !!student.emailVerified;
+
+  async function doAction(action: string) {
+    setActionLoading(action);
+    await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: student.id, action }),
+    });
+    setActionLoading(null);
+    router.refresh();
+  }
 
   async function handleDelete() {
     if (!confirm(`"${student.name ?? student.email}" istifadəçisini silmək istədiyinizə əminsiniz?`)) return;
@@ -109,34 +121,78 @@ export function UserRow({ student }: { student: User & { createdAt: Date | strin
     router.refresh();
   }
 
+  async function handleImpersonate() {
+    if (!confirm(`"${student.name ?? student.email}" istifadəçisi kimi daxil olmaq istədiyinizə əminsiniz?`)) return;
+    setActionLoading("impersonate");
+    const res = await fetch(`/api/admin/users/${student.id}/impersonate`, { method: "POST" });
+    if (res.ok) {
+      const { token } = await res.json();
+      window.open(`/auth/impersonate?token=${token}`, "_blank");
+    }
+    setActionLoading(null);
+  }
+
   return (
     <>
       {showEdit && <EditUserModal user={student} onClose={() => setShowEdit(false)} />}
       <tr className="border-b border-gray-50 hover:bg-gray-50">
-        <td className="py-3 font-medium text-gray-900">{student.name ?? "–"}</td>
+        <td className="py-3">
+          <div className="font-medium text-gray-900">{student.name ?? "–"}</div>
+          {student.isBlocked && (
+            <span className="text-xs text-red-600 font-medium">Bloklanmış</span>
+          )}
+        </td>
         <td className="py-3">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
             {student.groupName ?? "–"}
           </span>
         </td>
         <td className="py-3 text-gray-600">{student.email}</td>
-        <td className="py-3 text-gray-500">
+        <td className="py-3">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            isVerified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+          }`}>
+            {isVerified ? "Təsdiqlənmiş" : "Gözləyir"}
+          </span>
+        </td>
+        <td className="py-3 text-gray-500 text-sm">
           {new Date(student.createdAt).toLocaleDateString("az-AZ")}
         </td>
         <td className="py-3 text-right">
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => setShowEdit(true)}
-              className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50"
-            >
+          <div className="flex items-center justify-end gap-1 flex-wrap">
+            {!isVerified ? (
+              <button onClick={() => doAction("verify")} disabled={actionLoading === "verify"}
+                className="text-xs text-green-700 hover:text-green-900 font-medium px-2 py-1 rounded hover:bg-green-50">
+                {actionLoading === "verify" ? "..." : "Təsdiqlə"}
+              </button>
+            ) : (
+              <button onClick={() => doAction("unverify")} disabled={actionLoading === "unverify"}
+                className="text-xs text-amber-600 hover:text-amber-800 font-medium px-2 py-1 rounded hover:bg-amber-50">
+                {actionLoading === "unverify" ? "..." : "Ləğv et"}
+              </button>
+            )}
+            {!student.isBlocked ? (
+              <button onClick={() => doAction("block")} disabled={actionLoading === "block"}
+                className="text-xs text-orange-600 hover:text-orange-800 font-medium px-2 py-1 rounded hover:bg-orange-50">
+                {actionLoading === "block" ? "..." : "Blokla"}
+              </button>
+            ) : (
+              <button onClick={() => doAction("unblock")} disabled={actionLoading === "unblock"}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
+                {actionLoading === "unblock" ? "..." : "Bloku aç"}
+              </button>
+            )}
+            <button onClick={() => setShowEdit(true)}
+              className="text-xs text-gray-600 hover:text-gray-900 font-medium px-2 py-1 rounded hover:bg-gray-100">
               Redaktə
             </button>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50"
-            >
-              {deleting ? "Silinir..." : "Sil"}
+            <button onClick={handleImpersonate} disabled={actionLoading === "impersonate"}
+              className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 rounded hover:bg-purple-50">
+              {actionLoading === "impersonate" ? "..." : "Giriş"}
+            </button>
+            <button onClick={handleDelete} disabled={deleting}
+              className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50">
+              {deleting ? "..." : "Sil"}
             </button>
           </div>
         </td>

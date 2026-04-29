@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { users } from "@/lib/schema";
+import { users, groups } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 const updateSchema = z.object({
   name: z.string().min(2).max(100),
-  groupName: z.string().min(1).max(100),
+  groupId: z.string().min(1),
   email: z.string().email(),
   newPassword: z.string().min(6).max(100).optional(),
 });
@@ -27,18 +27,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
 
-  const { name, groupName, email, newPassword } = parsed.data;
+  const { name, groupId, email, newPassword } = parsed.data;
 
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
   if (!existing) return NextResponse.json({ error: "İstifadəçi tapılmadı" }, { status: 404 });
 
+  const [group] = await db.select({ name: groups.name }).from(groups).where(eq(groups.id, groupId)).limit(1);
+  if (!group) return NextResponse.json({ error: "Qrup tapılmadı" }, { status: 400 });
+
+  const updates: Record<string, unknown> = { name, email, groupId, groupName: group.name };
   if (newPassword) {
-    const hashed = await bcrypt.hash(newPassword, 12);
-    await db.update(users).set({ name, groupName, email, password: hashed }).where(eq(users.id, id));
-  } else {
-    await db.update(users).set({ name, groupName, email }).where(eq(users.id, id));
+    updates.password = await bcrypt.hash(newPassword, 12);
   }
 
+  await db.update(users).set(updates).where(eq(users.id, id));
   return NextResponse.json({ success: true });
 }
 

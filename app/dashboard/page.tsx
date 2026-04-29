@@ -1,11 +1,12 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { examAttempts } from "@/lib/schema";
-import { eq, desc } from "drizzle-orm";
+import { examAttempts, examSessions } from "@/lib/schema";
+import { eq, desc, and } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
-import { MAX_SCORE } from "@/lib/questions";
+
+const MAX_SCORE = 500;
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -18,30 +19,37 @@ export default async function DashboardPage() {
     .orderBy(desc(examAttempts.completedAt))
     .limit(10);
 
+  // Check for in-progress session
+  const [activeSession] = await db
+    .select({ id: examSessions.id })
+    .from(examSessions)
+    .where(and(eq(examSessions.userId, session.user.id), eq(examSessions.status, "in_progress")))
+    .limit(1);
+
   const hasAttempt = attempts.length > 0;
   const bestScore = hasAttempt ? Math.max(...attempts.map((a) => a.score)) : 0;
+  const hasActiveSession = !!activeSession;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <Link href="/dashboard" className="font-semibold text-gray-900">
-            QA Exam Portal
-          </Link>
+          <Link href="/dashboard" className="font-semibold text-gray-900">QA Exam Portal</Link>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">{session.user.name}</span>
-            <Link href="/profile" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-              Məlumatlarım
-            </Link>
+            {session.user.impersonatedBy && (
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-lg font-medium">
+                Admin görünüşü
+              </span>
+            )}
+            <Link href="/profile" className="text-sm text-blue-600 hover:text-blue-700 font-medium">Məlumatlarım</Link>
             {session.user.role === "admin" && (
               <Link href="/admin" className="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition-colors">
                 Admin Panel
               </Link>
             )}
             <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
-              <button type="submit" className="btn-secondary text-sm py-1.5 px-3">
-                Çıxış
-              </button>
+              <button type="submit" className="btn-secondary text-sm py-1.5 px-3">Çıxış</button>
             </form>
           </div>
         </div>
@@ -70,7 +78,7 @@ export default async function DashboardPage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">İmtahan</h2>
               <p className="text-gray-500 text-sm mt-1">
-                100 sual • 7 mühazirə • Maksimum {MAX_SCORE} bal
+                Maksimum {MAX_SCORE} bal
               </p>
             </div>
             {hasAttempt ? (
@@ -79,6 +87,13 @@ export default async function DashboardPage() {
                   İştirak etdiniz
                 </span>
                 <p className="text-xs text-gray-400 mt-1">Yenidən iştirak mümkün deyil</p>
+              </div>
+            ) : hasActiveSession ? (
+              <div className="text-right">
+                <Link href="/exam" className="btn-primary bg-amber-600 hover:bg-amber-700">
+                  Davam et →
+                </Link>
+                <p className="text-xs text-amber-600 mt-1">Yarımçıq imtahan var</p>
               </div>
             ) : (
               <Link href="/exam" className="btn-primary">
@@ -125,14 +140,12 @@ export default async function DashboardPage() {
                           </span>
                         </td>
                         <td className="py-3 text-right text-gray-600">
-                          {attempt.correctAnswers}/100
+                          {attempt.correctAnswers}/{attempt.totalQuestions}
                         </td>
                         <td className="py-3 text-right text-gray-500">{dur}</td>
                         <td className="py-3 text-right">
-                          <Link
-                            href={`/dashboard/results/${attempt.id}`}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                          >
+                          <Link href={`/dashboard/results/${attempt.id}`}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium">
                             Detallı bax →
                           </Link>
                         </td>
