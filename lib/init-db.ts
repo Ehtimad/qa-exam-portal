@@ -111,6 +111,13 @@ export async function initDatabase() {
     )`;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS question_groups (
+      question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+      group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+      PRIMARY KEY (question_id, group_id)
+    )`;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS exam_questions (
       exam_id TEXT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
       question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,

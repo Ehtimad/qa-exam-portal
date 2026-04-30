@@ -1,16 +1,60 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { examAttempts, examSessions } from "@/lib/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { examAttempts, examSessions, exams, examQuestions, questions, users, questionGroups } from "@/lib/schema";
+import { eq, desc, and, or, isNull, inArray, sum } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
 
-const MAX_SCORE = 500;
+async function getDynamicMaxScore(groupId: string | null | undefined): Promise<number> {
+  try {
+    // 1. Check for active exam assigned to user's group (or global)
+    const activeExams = await db
+      .select({ id: exams.id, groupId: exams.groupId })
+      .from(exams)
+      .where(and(
+        eq(exams.isActive, true),
+        or(
+          groupId ? eq(exams.groupId, groupId) : isNull(exams.groupId),
+          isNull(exams.groupId)
+        )
+      ));
+
+    const exam = activeExams.find((e) => e.groupId === groupId) ?? activeExams.find((e) => !e.groupId) ?? null;
+
+    let questionIds: number[] = [];
+
+    if (exam) {
+      const rows = await db.select({ questionId: examQuestions.questionId })
+        .from(examQuestions).where(eq(examQuestions.examId, exam.id));
+      questionIds = rows.map((r) => r.questionId);
+    } else if (groupId) {
+      // 2. Fall back to question_groups M2M
+      const rows = await db.select({ questionId: questionGroups.questionId })
+        .from(questionGroups).where(eq(questionGroups.groupId, groupId));
+      questionIds = rows.map((r) => r.questionId);
+    }
+
+    if (questionIds.length === 0) {
+      // 3. All questions fallback
+      const [res] = await db.select({ total: sum(questions.points) }).from(questions);
+      return Number(res?.total ?? 500);
+    }
+
+    const [res] = await db.select({ total: sum(questions.points) })
+      .from(questions).where(inArray(questions.id, questionIds));
+    return Number(res?.total ?? 500);
+  } catch {
+    return 500;
+  }
+}
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session) redirect("/auth/signin");
+
+  const [userRow] = await db.select({ groupId: users.groupId }).from(users).where(eq(users.id, session.user.id)).limit(1);
+  const groupId = userRow?.groupId ?? null;
 
   const attempts = await db
     .select()
@@ -19,12 +63,13 @@ export default async function DashboardPage() {
     .orderBy(desc(examAttempts.completedAt))
     .limit(10);
 
-  // Check for in-progress session
   const [activeSession] = await db
     .select({ id: examSessions.id })
     .from(examSessions)
     .where(and(eq(examSessions.userId, session.user.id), eq(examSessions.status, "in_progress")))
     .limit(1);
+
+  const dynamicMax = await getDynamicMaxScore(groupId);
 
   const hasAttempt = attempts.length > 0;
   const bestScore = hasAttempt ? Math.max(...attempts.map((a) => a.score)) : 0;
@@ -68,7 +113,7 @@ export default async function DashboardPage() {
             <div className="text-gray-500 text-sm mt-1">Ən yüksək bal</div>
           </div>
           <div className="card text-center">
-            <div className="text-3xl font-bold text-purple-600">{MAX_SCORE}</div>
+            <div className="text-3xl font-bold text-purple-600">{dynamicMax}</div>
             <div className="text-gray-500 text-sm mt-1">Maksimum bal</div>
           </div>
         </div>
@@ -78,7 +123,7 @@ export default async function DashboardPage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">İmtahan</h2>
               <p className="text-gray-500 text-sm mt-1">
-                Maksimum {MAX_SCORE} bal
+                Maksimum {dynamicMax} bal
               </p>
             </div>
             {hasAttempt ? (

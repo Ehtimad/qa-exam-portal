@@ -5,27 +5,20 @@ import { useRouter } from "next/navigation";
 
 interface Question {
   id: number;
-  lectureId: number;
   text: string;
   type: string;
   options: string[];
   correctAnswers: number[];
-  difficulty: string;
   points: number;
   imageUrl?: string | null;
   explanation?: string | null;
 }
 
-const LECTURE_NAMES: Record<number, string> = {
-  1: "Testing Əsasları", 2: "SDLC-də Test", 3: "Statik Test",
-  4: "Test Analizi", 5: "Test İdarəetməsi", 6: "Test Alətləri", 7: "Yekun Mövzular",
-};
+interface GroupOption { id: string; name: string; assigned: boolean; }
 
 interface FormState {
-  lectureId: number;
   text: string;
   type: "single" | "multiple";
-  difficulty: "easy" | "medium" | "hard";
   points: number;
   options: string[];
   correctAnswers: number[];
@@ -34,15 +27,14 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  lectureId: 1, text: "", type: "single", difficulty: "medium",
-  points: 5, options: ["", "", "", ""], correctAnswers: [], imageUrl: "", explanation: "",
+  text: "", type: "single", points: 5,
+  options: ["", "", "", ""], correctAnswers: [], imageUrl: "", explanation: "",
 };
 
 export default function QuestionsClient({ initialQuestions }: { initialQuestions: Question[] }) {
   const router = useRouter();
   const [questions, setQuestions] = useState(initialQuestions);
   const [search, setSearch] = useState("");
-  const [lecFilter, setLecFilter] = useState("");
   const [editQ, setEditQ] = useState<Question | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -51,19 +43,20 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const filtered = questions.filter((q) => {
-    const matchSearch = !search || q.text.toLowerCase().includes(search.toLowerCase());
-    const matchLec = !lecFilter || q.lectureId === parseInt(lecFilter);
-    return matchSearch && matchLec;
-  });
+  // Group assignment modal state
+  const [groupModalQ, setGroupModalQ] = useState<Question | null>(null);
+  const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+  const [groupSaving, setGroupSaving] = useState(false);
+
+  const filtered = questions.filter((q) =>
+    !search || q.text.toLowerCase().includes(search.toLowerCase())
+  );
 
   function openEdit(q: Question) {
     setEditQ(q);
     setForm({
-      lectureId: q.lectureId,
       text: q.text,
       type: q.type as "single" | "multiple",
-      difficulty: q.difficulty as "easy" | "medium" | "hard",
       points: q.points,
       options: [...q.options, "", "", "", ""].slice(0, Math.max(4, q.options.length)),
       correctAnswers: [...q.correctAnswers],
@@ -96,16 +89,20 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
 
     setSaving(true);
     setError("");
-    const payload = { ...form, options: opts, imageUrl: form.imageUrl || null, explanation: form.explanation || null };
+    // Send required API fields with defaults for hidden fields
+    const payload = {
+      ...form,
+      options: opts,
+      imageUrl: form.imageUrl || null,
+      explanation: form.explanation || null,
+      lectureId: editQ ? (initialQuestions.find((q) => q.id === editQ.id) as unknown as { lectureId?: number })?.lectureId ?? 1 : 1,
+      difficulty: "medium" as const,
+    };
 
     const url = editQ ? `/api/admin/questions/${editQ.id}` : "/api/admin/questions";
     const method = editQ ? "PUT" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     setSaving(false);
 
     if (res.ok) {
@@ -149,6 +146,26 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  async function openGroupModal(q: Question) {
+    setGroupModalQ(q);
+    setGroupOptions([]);
+    const res = await fetch(`/api/admin/questions/${q.id}/groups`);
+    if (res.ok) setGroupOptions(await res.json());
+  }
+
+  async function saveGroupAssignments() {
+    if (!groupModalQ) return;
+    setGroupSaving(true);
+    const groupIds = groupOptions.filter((g) => g.assigned).map((g) => g.id);
+    await fetch(`/api/admin/questions/${groupModalQ.id}/groups`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupIds }),
+    });
+    setGroupSaving(false);
+    setGroupModalQ(null);
+  }
+
   const showForm = showAdd || editQ !== null;
 
   return (
@@ -159,9 +176,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
           <p className="text-sm text-gray-500 mt-1">{questions.length} sual</p>
         </div>
         <div className="flex gap-2">
-          <a href="/api/admin/questions/template" download className="btn-secondary text-sm">
-            CSV Şablon
-          </a>
+          <a href="/api/admin/questions/template" download className="btn-secondary text-sm">CSV Şablon</a>
           <label className="btn-secondary text-sm cursor-pointer">
             {importing ? "İdxal olunur..." : "CSV İdxal"}
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={importing} />
@@ -173,13 +188,6 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
       <div className="flex gap-3 mb-4">
         <input type="text" placeholder="Sual axtar..." value={search} onChange={(e) => setSearch(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 max-w-sm" />
-        <select value={lecFilter} onChange={(e) => setLecFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">Bütün mühazirələr</option>
-          {Object.entries(LECTURE_NAMES).map(([k, v]) => (
-            <option key={k} value={k}>M{k}: {v}</option>
-          ))}
-        </select>
       </div>
 
       <div className="card overflow-hidden">
@@ -189,10 +197,9 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-3 py-3 text-gray-500 font-medium w-12">#</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Sual</th>
-                <th className="text-left px-3 py-3 text-gray-500 font-medium">Mühazirə</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Tip</th>
-                <th className="text-left px-3 py-3 text-gray-500 font-medium">Çətinlik</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Bal</th>
+                <th className="text-left px-3 py-3 text-gray-500 font-medium">Qruplar</th>
                 <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
               </tr>
             </thead>
@@ -201,21 +208,18 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 <tr key={q.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-3 py-3 text-gray-400">{q.id}</td>
                   <td className="px-3 py-3 text-gray-900 max-w-xs truncate">{q.text}</td>
-                  <td className="px-3 py-3 text-gray-500">M{q.lectureId}</td>
                   <td className="px-3 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.type === "single" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"}`}>
                       {q.type === "single" ? "Tək" : "Çoxlu"}
                     </span>
                   </td>
-                  <td className="px-3 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      q.difficulty === "easy" ? "bg-green-50 text-green-700" :
-                      q.difficulty === "medium" ? "bg-yellow-50 text-yellow-700" : "bg-red-50 text-red-700"
-                    }`}>
-                      {q.difficulty === "easy" ? "Asan" : q.difficulty === "medium" ? "Orta" : "Çətin"}
-                    </span>
-                  </td>
                   <td className="px-3 py-3 text-gray-600">{q.points}</td>
+                  <td className="px-3 py-3">
+                    <button onClick={() => openGroupModal(q)}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded hover:bg-indigo-50 border border-indigo-200">
+                      Qrup Təyin Et
+                    </button>
+                  </td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => openEdit(q)} className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">Redaktə</button>
@@ -241,16 +245,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
             </h2>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mühazirə</label>
-                  <select value={form.lectureId} onChange={(e) => setForm({ ...form, lectureId: parseInt(e.target.value) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                    {Object.entries(LECTURE_NAMES).map(([k, v]) => (
-                      <option key={k} value={k}>M{k}: {v}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tip</label>
                   <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as "single" | "multiple", correctAnswers: [] })}
@@ -260,20 +255,10 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Çətinlik</label>
-                  <select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value as "easy" | "medium" | "hard" })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                    <option value="easy">Asan (3 bal)</option>
-                    <option value="medium">Orta (5 bal)</option>
-                    <option value="hard">Çətin (8 bal)</option>
-                  </select>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bal</label>
+                  <input type="number" min={1} value={form.points} onChange={(e) => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bal</label>
-                <input type="number" min={1} value={form.points} onChange={(e) => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
               </div>
 
               <div>
@@ -331,6 +316,41 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 {saving ? "Saxlanılır..." : "Saxla"}
               </button>
               <button onClick={() => { setEditQ(null); setShowAdd(false); }} className="btn-secondary flex-1">Ləğv et</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Group assignment modal */}
+      {groupModalQ && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Qrup Təyin Et</h2>
+            <p className="text-xs text-gray-500 mb-4 truncate">Sual #{groupModalQ.id}: {groupModalQ.text.slice(0, 50)}...</p>
+
+            {groupOptions.length === 0 ? (
+              <p className="text-gray-400 text-sm py-4 text-center">Yüklənir...</p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {groupOptions.map((g) => (
+                  <label key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" checked={g.assigned}
+                      onChange={(e) => setGroupOptions((prev) =>
+                        prev.map((x) => x.id === g.id ? { ...x, assigned: e.target.checked } : x)
+                      )}
+                      className="w-4 h-4 rounded accent-blue-600" />
+                    <span className="text-sm text-gray-800">{g.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={saveGroupAssignments} disabled={groupSaving || groupOptions.length === 0}
+                className="btn-primary flex-1">
+                {groupSaving ? "Saxlanılır..." : "Saxla"}
+              </button>
+              <button onClick={() => setGroupModalQ(null)} className="btn-secondary flex-1">Ləğv et</button>
             </div>
           </div>
         </div>

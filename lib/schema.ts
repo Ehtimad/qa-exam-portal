@@ -91,6 +91,12 @@ export const exams = pgTable("exams", {
   createdAt:        timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── QUESTION ↔ GROUPS (many-to-many) ────────────────────────────────────
+export const questionGroups = pgTable("question_groups", {
+  questionId: integer("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+  groupId:    text("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+}, (t) => ({ pk: primaryKey({ columns: [t.questionId, t.groupId] }) }));
+
 // ─── EXAM ↔ QUESTIONS (many-to-many) ─────────────────────────────────────
 export const examQuestions = pgTable("exam_questions", {
   examId:     text("exam_id").notNull().references(() => exams.id, { onDelete: "cascade" }),
@@ -133,6 +139,7 @@ export const examAttempts = pgTable("exam_attempts", {
 });
 
 // ─── TYPES ──────────────────────────────────────────────────────────────
+export type QuestionGroup = typeof questionGroups.$inferSelect;
 export type User         = typeof users.$inferSelect;
 export type NewUser      = typeof users.$inferInsert;
 export type Question     = typeof questions.$inferSelect;

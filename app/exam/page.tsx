@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import ExamClient from "./ExamClient";
 import { db } from "@/lib/db";
-import { examAttempts, examSessions, exams, examQuestions, questions, users } from "@/lib/schema";
+import { examAttempts, examSessions, exams, examQuestions, questions, users, questionGroups } from "@/lib/schema";
 import { and, eq, or, isNull, inArray } from "drizzle-orm";
 
 function shuffle<T>(arr: T[]): T[] {
@@ -68,7 +68,17 @@ export default async function ExamPage() {
         .from(examQuestions)
         .where(eq(examQuestions.examId, exam.id));
       questionIds = eqRows.map((r) => r.questionId);
-    } else {
+    } else if (groupId) {
+      // No active exam — try question_groups M2M for user's group
+      const qgRows = await db
+        .select({ questionId: questionGroups.questionId })
+        .from(questionGroups)
+        .where(eq(questionGroups.groupId, groupId));
+      questionIds = qgRows.map((r) => r.questionId);
+    }
+
+    if (questionIds.length === 0) {
+      // Final fallback: all questions
       const all = await db.select({ id: questions.id }).from(questions);
       questionIds = all.map((q) => q.id);
     }

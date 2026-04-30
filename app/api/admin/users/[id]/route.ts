@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { users, groups } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { users, groups, examSessions } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -30,7 +30,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { name, groupId, email, newPassword } = parsed.data;
 
-  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
+  const [existing] = await db.select({ id: users.id, groupId: users.groupId }).from(users).where(eq(users.id, id)).limit(1);
   if (!existing) return NextResponse.json({ error: "İstifadəçi tapılmadı" }, { status: 404 });
 
   const [group] = await db.select({ name: groups.name }).from(groups).where(eq(groups.id, groupId)).limit(1);
@@ -42,6 +42,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   await db.update(users).set(updates).where(eq(users.id, id));
+
+  // If group changed, clear any in-progress exam session so user gets fresh questions for new group
+  if (existing.groupId !== groupId) {
+    await db.delete(examSessions).where(
+      and(eq(examSessions.userId, id), eq(examSessions.status, "in_progress"))
+    );
+  }
+
   revalidatePath("/admin/users");
   return NextResponse.json({ success: true });
 }
