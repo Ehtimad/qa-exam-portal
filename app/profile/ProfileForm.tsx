@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+
+interface Group { id: string; name: string; }
 
 interface Props {
   initialName: string;
-  initialGroupName: string;
+  initialGroupId: string;
   email: string;
 }
 
-export default function ProfileForm({ initialName, initialGroupName, email }: Props) {
+export default function ProfileForm({ initialName, initialGroupId, email }: Props) {
   const [name, setName] = useState(initialName);
-  const [groupName, setGroupName] = useState(initialGroupName);
+  const [groupId, setGroupId] = useState(initialGroupId);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -19,10 +22,16 @@ export default function ProfileForm({ initialName, initialGroupName, email }: Pr
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  useEffect(() => {
+    fetch("/api/groups").then((r) => r.json()).then(setGroups).catch(() => {});
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!groupId) { setError("Qrup seçin"); return; }
 
     if (newPassword && newPassword !== confirmPassword) {
       setError("Yeni şifrələr uyğun gəlmir");
@@ -35,7 +44,7 @@ export default function ProfileForm({ initialName, initialGroupName, email }: Pr
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        groupName,
+        groupId,
         currentPassword: currentPassword || undefined,
         newPassword: newPassword || undefined,
       }),
@@ -43,7 +52,7 @@ export default function ProfileForm({ initialName, initialGroupName, email }: Pr
     setLoading(false);
 
     if (res.ok) {
-      setSuccess("Məlumatlar uğurla yeniləndi");
+      setSuccess("Məlumatlar uğurla yeniləndi. Qrup dəyişibsə, imtahan yenidən başlayacaq.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -80,14 +89,17 @@ export default function ProfileForm({ initialName, initialGroupName, email }: Pr
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Qrup</label>
-            <input
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
               required
-              minLength={1}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            >
+              <option value="">— Qrup seçin —</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
