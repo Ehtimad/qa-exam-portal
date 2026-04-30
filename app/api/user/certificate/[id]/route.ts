@@ -99,13 +99,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   // Footer
+  const siteUrl = process.env.NEXTAUTH_URL ?? "https://exam-portal-nine-azure.vercel.app";
   doc.setFillColor(37, 99, 235);
-  doc.rect(12, H - 30, W - 24, 18, "F");
+  doc.rect(12, H - 34, W - 24, 22, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(9);
-  doc.text("QA İmtahan Portalı  •  Bu sertifikat rəqəmsal imzalanmışdır", W / 2, H - 19, { align: "center" });
+  doc.text("QA İmtahan Portalı  •  Bu sertifikat rəqəmsal imzalanmışdır", W / 2, H - 24, { align: "center" });
   doc.setFontSize(8);
-  doc.text(`Sertifikat ID: ${attempt.id}`, W / 2, H - 14, { align: "center" });
+  doc.text(`Sertifikat ID: ${attempt.id}`, W / 2, H - 18, { align: "center" });
+  doc.setFontSize(7.5);
+  doc.setTextColor(180, 210, 255);
+  doc.text(`Yoxlama: ${siteUrl}/verify/${attempt.id}`, W / 2, H - 12, { align: "center" });
 
   const pdfBytes = doc.output("arraybuffer");
   return new NextResponse(Buffer.from(pdfBytes), {
