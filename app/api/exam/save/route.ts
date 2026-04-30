@@ -8,6 +8,7 @@ import { z } from "zod";
 const schema = z.object({
   answers: z.record(z.string(), z.array(z.number())),
   tabSwitches: z.number().int().min(0).optional(),
+  elapsedSeconds: z.number().int().min(0).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest) {
   };
   if (parsed.data.tabSwitches !== undefined) {
     updates.tabSwitches = parsed.data.tabSwitches;
+  }
+  if (parsed.data.elapsedSeconds !== undefined) {
+    updates.elapsedSeconds = parsed.data.elapsedSeconds;
   }
 
   await db.update(examSessions).set(updates).where(eq(examSessions.id, existing.id));

@@ -13,6 +13,7 @@ interface Question {
   difficulty: string;
   points: number;
   imageUrl?: string | null;
+  explanation?: string | null;
 }
 
 const LECTURE_NAMES: Record<number, string> = {
@@ -29,11 +30,12 @@ interface FormState {
   options: string[];
   correctAnswers: number[];
   imageUrl: string;
+  explanation: string;
 }
 
 const EMPTY_FORM: FormState = {
   lectureId: 1, text: "", type: "single", difficulty: "medium",
-  points: 5, options: ["", "", "", ""], correctAnswers: [], imageUrl: "",
+  points: 5, options: ["", "", "", ""], correctAnswers: [], imageUrl: "", explanation: "",
 };
 
 export default function QuestionsClient({ initialQuestions }: { initialQuestions: Question[] }) {
@@ -66,6 +68,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
       options: [...q.options, "", "", "", ""].slice(0, Math.max(4, q.options.length)),
       correctAnswers: [...q.correctAnswers],
       imageUrl: q.imageUrl ?? "",
+      explanation: q.explanation ?? "",
     });
     setError("");
   }
@@ -93,7 +96,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
 
     setSaving(true);
     setError("");
-    const payload = { ...form, options: opts, imageUrl: form.imageUrl || null };
+    const payload = { ...form, options: opts, imageUrl: form.imageUrl || null, explanation: form.explanation || null };
 
     const url = editQ ? `/api/admin/questions/${editQ.id}` : "/api/admin/questions";
     const method = editQ ? "PUT" : "POST";
@@ -136,7 +139,9 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     const data = await res.json();
     setImporting(false);
     if (res.ok) {
-      alert(`${data.imported} sual idxal edildi${data.errors?.length ? `. Xətalar: ${data.errors.join("; ")}` : ""}`);
+      const msgs = [`${data.imported ?? 0} yeni sual əlavə edildi`, data.updated ? `${data.updated} sual yeniləndi` : ""].filter(Boolean);
+      const errMsg = data.errors?.length ? `\n\nXətalar (${data.errors.length}):\n${data.errors.slice(0, 5).join("\n")}${data.errors.length > 5 ? `\n...+${data.errors.length - 5} daha` : ""}` : "";
+      alert(msgs.join(", ") + errMsg);
       router.refresh();
     } else {
       alert("İdxal xətası");
@@ -154,6 +159,9 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
           <p className="text-sm text-gray-500 mt-1">{questions.length} sual</p>
         </div>
         <div className="flex gap-2">
+          <a href="/api/admin/questions/template" download className="btn-secondary text-sm">
+            CSV Şablon
+          </a>
           <label className="btn-secondary text-sm cursor-pointer">
             {importing ? "İdxal olunur..." : "CSV İdxal"}
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={importing} />
@@ -271,6 +279,15 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sual mətni</label>
                 <textarea value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  İzahat <span className="text-gray-400 font-normal">(imtahan bitdikdən sonra tələbəyə göstərilir — istəyə görə)</span>
+                </label>
+                <textarea value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} rows={2}
+                  placeholder="Niyə bu cavab düzgündür?..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none" />
               </div>
 

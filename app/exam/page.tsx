@@ -117,7 +117,7 @@ export default async function ExamPage() {
 
   // Load DB questions
   const dbQs = await db
-    .select({ id: questions.id, lectureId: questions.lectureId, text: questions.text, type: questions.type, options: questions.options, points: questions.points })
+    .select({ id: questions.id, text: questions.text, type: questions.type, options: questions.options, points: questions.points })
     .from(questions)
     .where(inArray(questions.id, questionOrder));
 
@@ -128,7 +128,15 @@ export default async function ExamPage() {
 
   return (
     <ExamClient
-      session={{ id: examSession.id, examId: examSession.examId, questionOrder, optionOrders, answers, tabSwitches: examSession.tabSwitches }}
+      session={{
+        id: examSession.id,
+        examId: examSession.examId,
+        questionOrder,
+        optionOrders,
+        answers,
+        tabSwitches: examSession.tabSwitches,
+        elapsedSeconds: examSession.elapsedSeconds,
+      }}
       questions={parsedQuestions}
       timeLimitMinutes={timeLimitMinutes}
     />

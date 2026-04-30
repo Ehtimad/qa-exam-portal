@@ -53,22 +53,17 @@ interface DBQuestion {
 
 /**
  * Full exam scoring.
- *
- * @param answers       {[questionId]: displayIndices[]}  (as stored during session)
- * @param questionOrder Shuffled question ID list (original IDs, just reordered)
- * @param optionOrders  {[questionId]: originalIndicesInDisplayOrder[]}
- * @param dbQuestions   Questions from DB
- * @param maxScore      Target max score (500)
+ * score = sum of earned points (same scale as maxScore = sum of question points).
+ * The maxScore param is kept for backward compat but ignored — dynamicMax is computed internally.
  */
 export function calculateExamScore(
   answers: Record<string, number[]>,
   questionOrder: number[],
   optionOrders: Record<string, number[]>,
   dbQuestions: DBQuestion[],
-  maxScore = 500
+  _maxScore = 500
 ): { score: number; correctCount: number; details: ScoredQuestion[] } {
   const qMap = new Map(dbQuestions.map((q) => [q.id, q]));
-  const rawMax = dbQuestions.reduce((s, q) => s + q.points, 0);
 
   let rawScore = 0;
   let correctCount = 0;
@@ -102,6 +97,5 @@ export function calculateExamScore(
     });
   }
 
-  const score = rawMax > 0 ? Math.round((rawScore / rawMax) * maxScore) : 0;
-  return { score, correctCount, details };
+  return { score: Math.round(rawScore * 100) / 100, correctCount, details };
 }

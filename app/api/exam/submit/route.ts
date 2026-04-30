@@ -12,8 +12,6 @@ const schema = z.object({
   duration: z.number().optional(),
 });
 
-const MAX_SCORE = 500;
-
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -77,7 +75,10 @@ export async function POST(req: NextRequest) {
     correctAnswers: questions.correctAnswers,
   }).from(questions).where(inArray(questions.id, questionOrder));
 
-  const { score, correctCount } = calculateExamScore(answers, questionOrder, optionOrders, dbQs, MAX_SCORE);
+  // Dynamic maxScore = sum of all question points in this exam
+  const dynamicMax = dbQs.reduce((sum, q) => sum + q.points, 0);
+
+  const { score, correctCount } = calculateExamScore(answers, questionOrder, optionOrders, dbQs, dynamicMax);
 
   const [inserted] = await db.insert(examAttempts).values({
     id: crypto.randomUUID(),
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
     examId,
     answers: JSON.stringify(answers),
     score,
-    maxScore: MAX_SCORE,
+    maxScore: dynamicMax,
     totalQuestions: questionOrder.length,
     correctAnswers: correctCount,
     tabSwitches,
@@ -94,10 +95,9 @@ export async function POST(req: NextRequest) {
     duration: parsed.data.duration,
   }).returning({ id: examAttempts.id });
 
-  // Mark session as submitted
   if (sessionId) {
     await db.update(examSessions).set({ status: "submitted" }).where(eq(examSessions.id, sessionId));
   }
 
-  return NextResponse.json({ score, maxScore: MAX_SCORE, correct: correctCount, attemptId: inserted.id }, { status: 201 });
+  return NextResponse.json({ score, maxScore: dynamicMax, correct: correctCount, attemptId: inserted.id }, { status: 201 });
 }

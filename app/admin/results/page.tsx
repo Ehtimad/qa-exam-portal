@@ -77,6 +77,13 @@ export default async function AdminResultsPage({
             >
               Excel Export
             </a>
+            <a
+              href="/api/admin/export/pdf"
+              className="btn-secondary text-sm py-1.5 px-3"
+              download
+            >
+              PDF Export
+            </a>
           </div>
         </div>
 

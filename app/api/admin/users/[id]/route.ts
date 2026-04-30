@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users, groups } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -41,6 +42,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   await db.update(users).set(updates).where(eq(users.id, id));
+  revalidatePath("/admin/users");
   return NextResponse.json({ success: true });
 }
 
@@ -49,5 +51,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params;
   await db.delete(users).where(eq(users.id, id));
+  revalidatePath("/admin/users");
   return NextResponse.json({ success: true });
 }

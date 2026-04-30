@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 interface DBQuestion {
   id: number;
-  lectureId: number;
   text: string;
   type: string;
   options: string[];
@@ -19,6 +18,7 @@ interface SessionData {
   optionOrders: Record<string, number[]>;
   answers: Record<string, number[]>;
   tabSwitches: number;
+  elapsedSeconds: number;
 }
 
 interface Props {
@@ -38,7 +38,7 @@ export default function ExamClient({ session, questions, timeLimitMinutes }: Pro
   const [current, setCurrent] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(session.elapsedSeconds);
   const [tabWarn, setTabWarn] = useState(false);
 
   const questionOrder = session.questionOrder;
@@ -70,17 +70,17 @@ export default function ExamClient({ session, questions, timeLimitMinutes }: Pro
     });
   }
 
-  // Auto-save every 30 seconds
-  const doSave = useCallback(async (ans: Record<string, number[]>, sw: number) => {
+  // Auto-save every 30 seconds (includes elapsedSeconds for time resume)
+  const doSave = useCallback(async (ans: Record<string, number[]>, sw: number, elapsedSec: number) => {
     await fetch("/api/exam/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answers: ans, tabSwitches: sw }),
+      body: JSON.stringify({ answers: ans, tabSwitches: sw, elapsedSeconds: elapsedSec }),
     }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    saveTimer.current = setInterval(() => doSave(answers, tabSwitches.current), 30_000);
+    saveTimer.current = setInterval(() => doSave(answers, tabSwitches.current, elapsed), 30_000);
     heartbeatTimer.current = setInterval(() => {
       fetch("/api/user/heartbeat", { method: "POST" }).catch(() => {});
     }, 60_000);
@@ -102,17 +102,20 @@ export default function ExamClient({ session, questions, timeLimitMinutes }: Pro
         tabSwitches.current += 1;
         setTabWarn(true);
         setTimeout(() => setTabWarn(false), 3000);
-        doSave(answers, tabSwitches.current);
+        doSave(answers, tabSwitches.current, elapsed);
       }
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [answers, doSave]);
 
-  // Timer (elapsed since page load, or countdown if time-limited)
+  // Timer — increments from resumed elapsedSeconds
   useEffect(() => {
+    const base = session.elapsedSeconds;
+    startTime.current = Date.now() - base * 1000;
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startTime.current) / 1000)), 1000);
     return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-submit when time limit reached
@@ -155,7 +158,7 @@ export default function ExamClient({ session, questions, timeLimitMinutes }: Pro
       : "İmtahandan çıxmaq istədiyinizə əminsiniz? (Heç bir cavab verilmədiyindən cəhd sayılmayacaq)";
 
     if (!confirm(msg)) return;
-    await doSave(answers, tabSwitches.current);
+    await doSave(answers, tabSwitches.current, elapsed);
     await fetch("/api/exam/abandon", { method: "POST" }).catch(() => {});
     router.push("/dashboard");
   }

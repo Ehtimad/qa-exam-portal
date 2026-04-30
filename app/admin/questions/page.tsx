@@ -15,6 +15,7 @@ export default async function AdminQuestionsPage() {
     ...q,
     options: JSON.parse(q.options) as string[],
     correctAnswers: JSON.parse(q.correctAnswers) as number[],
+    explanation: q.explanation ?? null,
   }));
 
   return (

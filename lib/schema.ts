@@ -75,6 +75,7 @@ export const questions = pgTable("questions", {
   difficulty:     text("difficulty").notNull(),       // "easy"|"medium"|"hard"
   points:         integer("points").notNull(),
   imageUrl:       text("image_url"),
+  explanation:    text("explanation"),
   createdAt:      timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -104,10 +105,11 @@ export const examSessions = pgTable("exam_sessions", {
   questionOrder: text("question_order").notNull(),  // JSON: number[]
   optionOrders:  text("option_orders").notNull(),   // JSON: {[qId]: number[]}
   answers:       text("answers").notNull().default("{}"),
-  tabSwitches:   integer("tab_switches").notNull().default(0),
-  startedAt:     timestamp("started_at").notNull().defaultNow(),
-  lastActiveAt:  timestamp("last_active_at").notNull().defaultNow(),
-  status:        text("status").notNull().default("in_progress"),
+  tabSwitches:    integer("tab_switches").notNull().default(0),
+  elapsedSeconds: integer("elapsed_seconds").notNull().default(0),
+  startedAt:      timestamp("started_at").notNull().defaultNow(),
+  lastActiveAt:   timestamp("last_active_at").notNull().defaultNow(),
+  status:         text("status").notNull().default("in_progress"),
   // "in_progress" | "submitted" | "abandoned"
 });
 

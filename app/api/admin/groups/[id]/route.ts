@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { groups } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 async function requireAdmin() {
@@ -19,6 +20,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const [g] = await db.update(groups).set({ name: parsed.data }).where(eq(groups.id, id)).returning();
   if (!g) return NextResponse.json({ error: "Tapılmadı" }, { status: 404 });
+  revalidatePath("/admin/groups");
+  revalidatePath("/admin/users");
   return NextResponse.json(g);
 }
 
@@ -26,5 +29,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
   await db.delete(groups).where(eq(groups.id, id));
+  revalidatePath("/admin/groups");
+  revalidatePath("/admin/users");
   return NextResponse.json({ success: true });
 }

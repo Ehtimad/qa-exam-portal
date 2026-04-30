@@ -2,14 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { questions } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 async function requireAdmin() {
   const s = await auth();
   return s?.user?.role === "admin" ? s : null;
 }
 
-// CSV format: id,lectureId,type,difficulty,points,text,opt1,opt2,...,optN,correct (semicolon-separated correct answer indices)
+// Template CSV format (header row optional):
+// id,lecture_id,text,type,option_1,option_2,option_3,option_4,option_5,option_6,correct_answers,difficulty,points,explanation
+// correct_answers: semicolon-separated 1-based option indices (e.g. "1" = first option, "1;3" = first and third)
+// id: leave empty to auto-assign
 export async function POST(req: NextRequest) {
   if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -17,59 +20,108 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "Fayl tapılmadı" }, { status: 400 });
 
-  const text = await file.text();
-  const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("#"));
+  const rawText = await file.text();
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  if (lines.length === 0) return NextResponse.json({ error: "Fayl boşdur" }, { status: 400 });
+
+  // Detect if first row is a header
+  const firstCols = parseCsvLine(lines[0]);
+  const hasHeader = firstCols[0].toLowerCase() === "id" || firstCols[2]?.toLowerCase() === "text";
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  // Get max existing id for auto-increment
+  const allIds = await db.select({ id: questions.id }).from(questions);
+  let nextId = allIds.length > 0 ? Math.max(...allIds.map((q) => q.id)) + 1 : 1;
 
   let imported = 0;
+  let updated = 0;
   const errors: string[] = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const cols = lines[i].split(",").map((c) => c.trim());
-    if (cols.length < 7) { errors.push(`Sətir ${i + 1}: kifayət qədər sütun yoxdur`); continue; }
+  for (let i = 0; i < dataLines.length; i++) {
+    const lineNum = hasHeader ? i + 2 : i + 1;
+    const cols = parseCsvLine(dataLines[i]);
+
+    if (cols.length < 12) {
+      errors.push(`Sətir ${lineNum}: kifayət qədər sütun yoxdur (ən az 12 lazımdır, ${cols.length} tapıldı)`);
+      continue;
+    }
 
     try {
-      const [idStr, lectureIdStr, type, difficulty, pointsStr, ...rest] = cols;
-      const correctRaw = rest[rest.length - 1];
-      const opts = rest.slice(0, -1);
+      const [idStr, lectureIdStr, text, type, ...rest] = cols;
+      // rest: option_1..option_6, correct_answers, difficulty, points, explanation(optional)
+      const options = rest.slice(0, 6).filter((o) => o.trim() !== "");
+      const correctRaw = rest[6] ?? "";
+      const difficulty = rest[7] ?? "medium";
+      const pointsStr = rest[8] ?? "5";
+      const explanation = rest[9] ?? null;
 
-      const id = parseInt(idStr);
       const lectureId = parseInt(lectureIdStr);
       const points = parseInt(pointsStr);
-      const correctAnswers = correctRaw.split(";").map((n) => parseInt(n.trim()));
 
-      if (isNaN(id) || isNaN(lectureId) || isNaN(points)) {
-        errors.push(`Sətir ${i + 1}: rəqəm formatı yanlışdır`);
-        continue;
-      }
-      if (!["single", "multiple"].includes(type)) {
-        errors.push(`Sətir ${i + 1}: type "single" və ya "multiple" olmalıdır`);
-        continue;
-      }
+      if (!text.trim()) { errors.push(`Sətir ${lineNum}: sual mətni boşdur`); continue; }
+      if (isNaN(lectureId) || lectureId < 1) { errors.push(`Sətir ${lineNum}: lecture_id yanlışdır`); continue; }
+      if (!["single", "multiple"].includes(type)) { errors.push(`Sətir ${lineNum}: type "single" və ya "multiple" olmalıdır`); continue; }
+      if (!["easy", "medium", "hard"].includes(difficulty)) { errors.push(`Sətir ${lineNum}: difficulty "easy"/"medium"/"hard" olmalıdır`); continue; }
+      if (isNaN(points) || points < 1) { errors.push(`Sətir ${lineNum}: points yanlışdır`); continue; }
+      if (options.length < 2) { errors.push(`Sətir ${lineNum}: ən az 2 variant lazımdır`); continue; }
 
-      // Upsert
-      const [existing] = await db.select({ id: questions.id }).from(questions).where(eq(questions.id, id)).limit(1);
-      if (existing) {
-        await db.update(questions).set({
-          lectureId, text: opts[0], type: type as "single" | "multiple",
-          options: JSON.stringify(opts.slice(1)),
-          correctAnswers: JSON.stringify(correctAnswers),
-          difficulty: difficulty as "easy" | "medium" | "hard",
-          points,
-        }).where(eq(questions.id, id));
-      } else {
-        await db.insert(questions).values({
-          id, lectureId, text: opts[0], type: type as "single" | "multiple",
-          options: JSON.stringify(opts.slice(1)),
-          correctAnswers: JSON.stringify(correctAnswers),
-          difficulty: difficulty as "easy" | "medium" | "hard",
-          points,
-        });
-      }
-      imported++;
+      // correct_answers: 1-based → 0-based
+      const correctAnswers = correctRaw
+        .split(";")
+        .map((n) => parseInt(n.trim()) - 1)
+        .filter((n) => !isNaN(n) && n >= 0 && n < options.length);
+
+      if (correctAnswers.length === 0) { errors.push(`Sətir ${lineNum}: düzgün cavab göstərilməyib`); continue; }
+
+      const id = idStr.trim() ? parseInt(idStr) : nextId;
+      if (isNaN(id) || id < 1) { errors.push(`Sətir ${lineNum}: id yanlışdır`); continue; }
+
+      const values = {
+        lectureId,
+        text: text.trim(),
+        type: type as "single" | "multiple",
+        options: JSON.stringify(options),
+        correctAnswers: JSON.stringify(correctAnswers),
+        difficulty: difficulty as "easy" | "medium" | "hard",
+        points,
+        explanation: explanation?.trim() || null,
+      };
+
+      const wasExisting = allIds.some((r) => r.id === id);
+
+      await db.insert(questions).values({ id, ...values })
+        .onConflictDoUpdate({ target: questions.id, set: values });
+
+      if (wasExisting) { updated++; }
+      else { imported++; if (id === nextId) nextId++; allIds.push({ id }); }
+
     } catch (e) {
-      errors.push(`Sətir ${i + 1}: ${String(e)}`);
+      errors.push(`Sətir ${lineNum}: ${String(e).slice(0, 100)}`);
     }
   }
 
-  return NextResponse.json({ imported, errors });
+  revalidatePath("/admin/questions");
+  return NextResponse.json({ imported, updated, errors, total: imported + updated });
+}
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
 }

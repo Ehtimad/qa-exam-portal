@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { exams, examQuestions, groups, questions } from "@/lib/schema";
 import { asc, eq, inArray } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 async function requireAdmin() {
@@ -70,5 +71,6 @@ export async function POST(req: NextRequest) {
     await db.insert(examQuestions).values(questionIds.map((qId) => ({ examId: exam.id, questionId: qId })));
   }
 
+  revalidatePath("/admin/exams");
   return NextResponse.json(exam, { status: 201 });
 }

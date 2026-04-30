@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { groups } from "@/lib/schema";
 import { asc } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 async function requireAdmin() {
@@ -26,5 +27,7 @@ export async function POST(req: NextRequest) {
     id: crypto.randomUUID(),
     name: parsed.data,
   }).returning();
+  revalidatePath("/admin/groups");
+  revalidatePath("/admin/users");
   return NextResponse.json(g, { status: 201 });
 }

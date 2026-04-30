@@ -93,8 +93,10 @@ export async function initDatabase() {
       difficulty TEXT NOT NULL,
       points INTEGER NOT NULL,
       image_url TEXT,
+      explanation TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
+  await sql`ALTER TABLE questions ADD COLUMN IF NOT EXISTS explanation TEXT`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS exams (
@@ -124,10 +126,12 @@ export async function initDatabase() {
       option_orders TEXT NOT NULL,
       answers TEXT NOT NULL DEFAULT '{}',
       tab_switches INTEGER NOT NULL DEFAULT 0,
+      elapsed_seconds INTEGER NOT NULL DEFAULT 0,
       started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       status TEXT NOT NULL DEFAULT 'in_progress'
     )`;
+  await sql`ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS elapsed_seconds INTEGER NOT NULL DEFAULT 0`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS exam_attempts (
@@ -176,9 +180,8 @@ export async function initDatabase() {
     FROM groups g
     WHERE u.group_name = g.name AND u.group_id IS NULL`;
 
-  // ── Seed questions from lib/questions.ts if table is empty ──────────
-  const [qCount] = await sql`SELECT count(*)::int AS c FROM questions`;
-  if ((qCount.c as number) === 0) {
+  // ── Seed/sync all questions from lib/questions.ts (always upsert) ───
+  {
     const { questions: qs } = await import("./questions");
     for (const q of qs) {
       await sql`
@@ -187,19 +190,30 @@ export async function initDatabase() {
           ${q.id}, ${q.lecture}, ${q.text}, ${q.type},
           ${JSON.stringify(q.options)}, ${JSON.stringify(q.correctAnswers)},
           ${q.difficulty}, ${q.points}
-        ) ON CONFLICT (id) DO NOTHING`;
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          lecture_id      = EXCLUDED.lecture_id,
+          text            = EXCLUDED.text,
+          type            = EXCLUDED.type,
+          options         = EXCLUDED.options,
+          correct_answers = EXCLUDED.correct_answers,
+          difficulty      = EXCLUDED.difficulty,
+          points          = EXCLUDED.points`;
     }
-    console.log(`[init-db] ${qs.length} sual DB-yə yükləndi`);
+    console.log(`[init-db] ${qs.length} sual DB-yə yükləndi/yeniləndi`);
 
-    // Create a default exam with all questions (for backward compat)
-    const examId = crypto.randomUUID();
-    await sql`
-      INSERT INTO exams (id, title, is_active, shuffle_questions, shuffle_options)
-      VALUES (${examId}, 'QA ISTQB İmtahan', true, true, true)`;
-    for (const q of qs) {
-      await sql`INSERT INTO exam_questions (exam_id, question_id) VALUES (${examId}, ${q.id})`;
+    // Create a default exam with all questions only if no exams exist
+    const [examCount] = await sql`SELECT count(*)::int AS c FROM exams`;
+    if ((examCount.c as number) === 0) {
+      const examId = crypto.randomUUID();
+      await sql`
+        INSERT INTO exams (id, title, is_active, shuffle_questions, shuffle_options)
+        VALUES (${examId}, 'QA ISTQB İmtahan', true, true, true)`;
+      for (const q of qs) {
+        await sql`INSERT INTO exam_questions (exam_id, question_id) VALUES (${examId}, ${q.id})`;
+      }
+      console.log("[init-db] Default imtahan yaradıldı");
     }
-    console.log("[init-db] Default imtahan yaradıldı");
   }
 
   console.log("[init-db] Verilənlər bazası hazırdır");

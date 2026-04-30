@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 async function requireAdmin() {
   const session = await auth();
@@ -57,5 +58,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Yanlış əməliyyat" }, { status: 400 });
   }
 
+  revalidatePath("/admin/users");
   return NextResponse.json({ success: true });
 }

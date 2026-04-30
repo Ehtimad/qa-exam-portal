@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { questions } from "@/lib/schema";
 import { asc, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 async function requireAdmin() {
@@ -20,6 +21,7 @@ const questionSchema = z.object({
   difficulty: z.enum(["easy", "medium", "hard"]),
   points: z.number().int().min(1),
   imageUrl: z.string().url().optional().nullable(),
+  explanation: z.string().optional().nullable(),
 });
 
 export async function GET() {
@@ -34,12 +36,11 @@ export async function POST(req: NextRequest) {
   const parsed = questionSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil", details: parsed.error.flatten() }, { status: 400 });
 
-  const { id, lectureId, text, type, options, correctAnswers, difficulty, points, imageUrl } = parsed.data;
+  const { id, lectureId, text, type, options, correctAnswers, difficulty, points, imageUrl, explanation } = parsed.data;
 
   // Auto-assign next id if not provided
   let newId = id;
   if (!newId) {
-    const [last] = await db.select({ id: questions.id }).from(questions).orderBy(asc(questions.id));
     const allIds = await db.select({ id: questions.id }).from(questions);
     newId = allIds.length > 0 ? Math.max(...allIds.map((q) => q.id)) + 1 : 1;
   }
@@ -54,7 +55,9 @@ export async function POST(req: NextRequest) {
     difficulty,
     points,
     imageUrl: imageUrl ?? null,
+    explanation: explanation ?? null,
   }).returning();
 
+  revalidatePath("/admin/questions");
   return NextResponse.json({ ...q, options: JSON.parse(q.options), correctAnswers: JSON.parse(q.correctAnswers) }, { status: 201 });
 }

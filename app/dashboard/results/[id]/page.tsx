@@ -1,10 +1,9 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { examAttempts } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { examAttempts, questions } from "@/lib/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { questions } from "@/lib/questions";
 
 export default async function ResultDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -21,12 +20,28 @@ export default async function ResultDetailPage({ params }: { params: Promise<{ i
   if (!attempt) notFound();
 
   const userAnswers: Record<string, number[]> = JSON.parse(attempt.answers);
+  const questionOrder: number[] = attempt.questionOrder ? JSON.parse(attempt.questionOrder) : [];
+  const optionOrders: Record<string, number[]> = attempt.optionOrders ? JSON.parse(attempt.optionOrders) : {};
+
   const pct = Math.round((attempt.score / attempt.maxScore) * 100);
   const passed = pct >= 70;
 
   const dur = attempt.duration
     ? `${Math.floor(attempt.duration / 60)} dəq ${attempt.duration % 60} san`
     : "–";
+
+  // Load DB questions (with explanation)
+  const displayOrder = questionOrder.length > 0 ? questionOrder : [];
+  const dbQs = displayOrder.length > 0
+    ? await db.select({ id: questions.id, text: questions.text, options: questions.options, correctAnswers: questions.correctAnswers, points: questions.points, explanation: questions.explanation })
+        .from(questions).where(inArray(questions.id, displayOrder))
+    : [];
+
+  const qMap = new Map(dbQs.map((q) => [q.id, q]));
+
+  const orderedQs = displayOrder.length > 0
+    ? displayOrder.map((qid) => qMap.get(qid)).filter(Boolean)
+    : dbQs;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -53,16 +68,36 @@ export default async function ResultDetailPage({ params }: { params: Promise<{ i
                 </span>
               </div>
               <p className="text-gray-500 text-sm mt-1">
-                {attempt.correctAnswers} düzgün / 100 sual • {pct}% • {dur}
+                {attempt.correctAnswers} düzgün / {attempt.totalQuestions} sual • {pct}% • {dur}
               </p>
               <p className="text-gray-400 text-xs mt-1">
                 {new Date(attempt.completedAt).toLocaleString("az-AZ")}
               </p>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Nəticə</div>
-              <div className={`text-5xl font-bold ${pct >= 70 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-600"}`}>
-                {pct}%
+            <div className="flex flex-col items-end gap-3">
+              <div>
+                <div className="text-sm text-gray-500">Nəticə</div>
+                <div className={`text-5xl font-bold ${pct >= 70 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-600"}`}>
+                  {pct}%
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={`/api/user/result/${attempt.id}`}
+                  download
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Nəticəni PDF Yüklə
+                </a>
+                {passed && (
+                  <a
+                    href={`/api/user/certificate/${attempt.id}`}
+                    download
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-green-400 bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                  >
+                    Sertifikat Yüklə
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -70,11 +105,17 @@ export default async function ResultDetailPage({ params }: { params: Promise<{ i
 
         {/* Per-question breakdown */}
         <div className="space-y-4">
-          {questions.map((q, idx) => {
-            const given = (userAnswers[String(q.id)] ?? []).slice().sort((a, b) => a - b);
-            const expected = q.correctAnswers.slice().sort((a, b) => a - b);
+          {orderedQs.map((q, idx) => {
+            if (!q) return null;
+            const correctAnswers: number[] = JSON.parse(q.correctAnswers);
+            const optionOrder = optionOrders[String(q.id)] ?? Array.from({ length: 10 }, (_, i) => i);
+            const displayGiven = userAnswers[String(q.id)] ?? [];
+            const originalGiven = displayGiven.map((di) => optionOrder[di] ?? di);
+            const options: string[] = JSON.parse(q.options);
+
             const isCorrect =
-              given.length === expected.length && given.every((v, i) => v === expected[i]);
+              originalGiven.length === correctAnswers.length &&
+              [...originalGiven].sort((a, b) => a - b).every((v, i) => v === [...correctAnswers].sort((a, b) => a - b)[i]);
 
             return (
               <div key={q.id} className={`card border-l-4 ${isCorrect ? "border-l-green-500" : "border-l-red-400"}`}>
@@ -93,9 +134,9 @@ export default async function ResultDetailPage({ params }: { params: Promise<{ i
                 </div>
 
                 <div className="space-y-1.5 ml-8">
-                  {q.options.map((option, oi) => {
-                    const userPicked = given.includes(oi);
-                    const isRight = expected.includes(oi);
+                  {options.map((option, oi) => {
+                    const userPicked = originalGiven.includes(oi);
+                    const isRight = correctAnswers.includes(oi);
 
                     let cls = "text-gray-600 bg-gray-50 border-gray-200";
                     let label = "";
@@ -118,6 +159,13 @@ export default async function ResultDetailPage({ params }: { params: Promise<{ i
                     );
                   })}
                 </div>
+
+                {!isCorrect && q.explanation && (
+                  <div className="ml-8 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">İzahat:</p>
+                    <p className="text-sm text-amber-800">{q.explanation}</p>
+                  </div>
+                )}
               </div>
             );
           })}
