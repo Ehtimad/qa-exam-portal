@@ -5,10 +5,11 @@ import { examAttempts, users } from "@/lib/schema";
 import { eq, sql } from "drizzle-orm";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { canExportResults } from "@/lib/rbac";
 
 export async function GET() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") {
+  if (!session || !canExportResults(session.user.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

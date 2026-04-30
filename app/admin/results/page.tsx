@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ResetButton } from "./ResetButton";
 import { Suspense } from "react";
 import ResultsFilterBar from "./ResultsFilterBar";
+import { canViewResults } from "@/lib/rbac";
 
 export default async function AdminResultsPage({
   searchParams,
@@ -14,7 +15,7 @@ export default async function AdminResultsPage({
   searchParams: Promise<{ q?: string; group?: string; result?: string }>;
 }) {
   const session = await auth();
-  if (!session || session.user.role !== "admin") redirect("/dashboard");
+  if (!session || !canViewResults(session.user.role)) redirect("/admin");
 
   const { q = "", group = "", result = "" } = await searchParams;
 

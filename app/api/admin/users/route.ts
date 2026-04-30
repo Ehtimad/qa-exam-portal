@@ -4,21 +4,23 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { canManageUsers } from "@/lib/rbac";
 
 async function requireAdmin() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") return null;
+  if (!session || !canManageUsers(session.user.role)) return null;
   return session;
 }
 
 export async function GET() {
   if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const allStudents = await db
+  const allUsers = await db
     .select({
       id: users.id,
       name: users.name,
       email: users.email,
+      role: users.role,
       groupName: users.groupName,
       groupId: users.groupId,
       emailVerified: users.emailVerified,
@@ -26,10 +28,9 @@ export async function GET() {
       createdAt: users.createdAt,
     })
     .from(users)
-    .where(eq(users.role, "student"))
     .orderBy(users.createdAt);
 
-  return NextResponse.json(allStudents);
+  return NextResponse.json(allUsers);
 }
 
 export async function PATCH(req: NextRequest) {

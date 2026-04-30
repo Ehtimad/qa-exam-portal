@@ -3,15 +3,16 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { examAttempts, users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { canViewResults, canManageUsers } from "@/lib/rbac";
 
-async function requireAdmin() {
+async function requireViewResults() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") return null;
+  if (!session || !canViewResults(session.user.role)) return null;
   return session;
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!await requireViewResults()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   const [attempt] = await db
@@ -38,7 +39,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const session = await auth();
+  if (!session || !canManageUsers(session.user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { id } = await params;
   await db.delete(examAttempts).where(eq(examAttempts.id, id));

@@ -3,10 +3,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { questions } from "@/lib/schema";
 import { revalidatePath } from "next/cache";
+import { canUploadQuestions } from "@/lib/rbac";
 
 async function requireAdmin() {
   const s = await auth();
-  return s?.user?.role === "admin" ? s : null;
+  return canUploadQuestions(s?.user?.role ?? "") ? s : null;
 }
 
 // Template CSV format (header row optional):

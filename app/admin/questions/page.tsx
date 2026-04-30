@@ -5,10 +5,11 @@ import { asc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import QuestionsClient from "./QuestionsClient";
+import { canManageQuestions } from "@/lib/rbac";
 
 export default async function AdminQuestionsPage() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") redirect("/dashboard");
+  if (!session || !canManageQuestions(session.user.role)) redirect("/admin");
 
   const all = await db.select().from(questions).orderBy(asc(questions.lectureId), asc(questions.id));
   const parsed = all.map((q) => ({

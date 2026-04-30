@@ -5,10 +5,11 @@ import { questions } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { canManageQuestions } from "@/lib/rbac";
 
 async function requireAdmin() {
   const s = await auth();
-  return s?.user?.role === "admin" ? s : null;
+  return canManageQuestions(s?.user?.role ?? "") ? s : null;
 }
 
 const updateSchema = z.object({

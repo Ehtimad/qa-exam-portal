@@ -4,6 +4,7 @@ import { users, examAttempts, questions } from "@/lib/schema";
 import { desc, gte } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { canViewAnalytics } from "@/lib/rbac";
 
 const LECTURE_NAMES: Record<number, string> = {
   1: "Testing Əsasları", 2: "SDLC-də Test", 3: "Statik Test",
@@ -14,7 +15,7 @@ export const revalidate = 0;
 
 export default async function AdminAnalyticsPage() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") redirect("/dashboard");
+  if (!session || !canViewAnalytics(session.user.role)) redirect("/admin");
 
   // --- Online Users (last 5 min) ---
   let onlineUsers: Array<{ id: string; name: string | null; email: string; groupName: string | null; lastSeenAt: Date | null }> = [];

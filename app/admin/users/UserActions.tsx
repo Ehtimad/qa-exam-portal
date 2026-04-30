@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ROLE_LABELS, ROLE_COLORS } from "@/lib/rbac";
 
 interface Group { id: string; name: string; }
 
@@ -9,6 +10,7 @@ interface User {
   id: string;
   name: string | null;
   email: string;
+  role: string;
   groupName: string | null;
   groupId: string | null;
   emailVerified: Date | string | null;
@@ -16,10 +18,13 @@ interface User {
   createdAt: Date | string;
 }
 
+const ALL_ROLES = ["student", "admin", "manager", "reporter", "worker"] as const;
+
 export function EditUserModal({ user, onClose }: { user: User; onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
+  const [role, setRole] = useState(user.role);
   const [groupId, setGroupId] = useState(user.groupId ?? "");
   const [newPassword, setNewPassword] = useState("");
   const [groups, setGroups] = useState<Group[]>([]);
@@ -31,13 +36,19 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
   }, []);
 
   async function handleSave() {
-    if (!groupId) { setError("Qrup seçin"); return; }
+    if (role === "student" && !groupId) { setError("Qrup seçin"); return; }
     setLoading(true);
     setError("");
     const res = await fetch(`/api/admin/users/${user.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, groupId, newPassword: newPassword || undefined }),
+      body: JSON.stringify({
+        name,
+        email,
+        role,
+        groupId: groupId || null,
+        newPassword: newPassword || undefined,
+      }),
     });
     setLoading(false);
     if (res.ok) {
@@ -66,7 +77,18 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Qrup</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+            <select value={role} onChange={(e) => setRole(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {ALL_ROLES.map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Qrup <span className="text-gray-400 font-normal">(tələbələr üçün)</span>
+            </label>
             <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">— Qrup seçin —</option>
@@ -95,7 +117,7 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
   );
 }
 
-export function UserRow({ student }: { student: User }) {
+export function UserRow({ student, showRole }: { student: User; showRole?: boolean }) {
   const router = useRouter();
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -136,29 +158,35 @@ export function UserRow({ student }: { student: User }) {
     <>
       {showEdit && <EditUserModal user={student} onClose={() => setShowEdit(false)} />}
       <tr className="border-b border-gray-50 hover:bg-gray-50">
-        <td className="py-3">
+        <td className="px-3 py-3">
           <div className="font-medium text-gray-900">{student.name ?? "–"}</div>
           {student.isBlocked && (
             <span className="text-xs text-red-600 font-medium">Bloklanmış</span>
           )}
         </td>
-        <td className="py-3">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-            {student.groupName ?? "–"}
-          </span>
+        <td className="px-3 py-3">
+          {showRole ? (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[student.role] ?? "bg-gray-100 text-gray-600"}`}>
+              {ROLE_LABELS[student.role] ?? student.role}
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+              {student.groupName ?? "–"}
+            </span>
+          )}
         </td>
-        <td className="py-3 text-gray-600">{student.email}</td>
-        <td className="py-3">
+        <td className="px-3 py-3 text-gray-600">{student.email}</td>
+        <td className="px-3 py-3">
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
             isVerified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
           }`}>
             {isVerified ? "Təsdiqlənmiş" : "Gözləyir"}
           </span>
         </td>
-        <td className="py-3 text-gray-500 text-sm">
+        <td className="px-3 py-3 text-gray-500 text-sm">
           {new Date(student.createdAt).toLocaleDateString("az-AZ")}
         </td>
-        <td className="py-3 text-right">
+        <td className="px-3 py-3 text-right">
           <div className="flex items-center justify-end gap-1 flex-wrap">
             {!isVerified ? (
               <button onClick={() => doAction("verify")} disabled={actionLoading === "verify"}

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { canUploadQuestions } from "@/lib/rbac";
 
 export async function GET() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") {
+  if (!session || !canUploadQuestions(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

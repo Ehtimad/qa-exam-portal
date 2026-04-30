@@ -5,10 +5,11 @@ import { asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import ExamsClient from "./ExamsClient";
+import { canManageExams } from "@/lib/rbac";
 
 export default async function AdminExamsPage() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") redirect("/dashboard");
+  if (!session || !canManageExams(session.user.role)) redirect("/admin");
 
   const allExams = await db.select({
     id: exams.id,

@@ -5,10 +5,11 @@ import { asc, eq, count } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import GroupsClient from "./GroupsClient";
+import { canManageGroups } from "@/lib/rbac";
 
 export default async function AdminGroupsPage() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") redirect("/dashboard");
+  if (!session || !canManageGroups(session.user.role)) redirect("/admin");
 
   const allGroups = await db.select().from(groups).orderBy(asc(groups.name));
 

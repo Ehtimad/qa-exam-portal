@@ -4,10 +4,11 @@ import { db } from "@/lib/db";
 import { examAttempts, users } from "@/lib/schema";
 import { eq, desc } from "drizzle-orm";
 import * as XLSX from "xlsx";
+import { canExportResults } from "@/lib/rbac";
 
 async function requireAdmin() {
   const s = await auth();
-  return s?.user?.role === "admin" ? s : null;
+  return canExportResults(s?.user?.role ?? "") ? s : null;
 }
 
 export async function GET() {

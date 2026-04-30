@@ -5,10 +5,11 @@ import { exams, examQuestions, groups, questions } from "@/lib/schema";
 import { asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { canManageExams } from "@/lib/rbac";
 
 async function requireAdmin() {
   const s = await auth();
-  return s?.user?.role === "admin" ? s : null;
+  return canManageExams(s?.user?.role ?? "") ? s : null;
 }
 
 const examSchema = z.object({

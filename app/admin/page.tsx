@@ -5,10 +5,11 @@ import { eq, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
+import { isStaff } from "@/lib/rbac";
 
 export default async function AdminPage() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") redirect("/dashboard");
+  if (!session || !isStaff(session.user.role)) redirect("/dashboard");
 
   const [totalStudents] = await db
     .select({ count: count() })

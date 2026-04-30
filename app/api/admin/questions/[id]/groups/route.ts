@@ -4,10 +4,11 @@ import { db } from "@/lib/db";
 import { groups, questionGroups } from "@/lib/schema";
 import { eq, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { canManageQuestions } from "@/lib/rbac";
 
 async function requireAdmin() {
   const s = await auth();
-  return s?.user?.role === "admin" ? s : null;
+  return canManageQuestions(s?.user?.role ?? "") ? s : null;
 }
 
 // GET: returns all groups with assigned=true/false for this question

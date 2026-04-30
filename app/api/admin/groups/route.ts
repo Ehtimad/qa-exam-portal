@@ -5,10 +5,11 @@ import { groups } from "@/lib/schema";
 import { asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { canManageGroups } from "@/lib/rbac";
 
 async function requireAdmin() {
   const s = await auth();
-  return s?.user?.role === "admin" ? s : null;
+  return canManageGroups(s?.user?.role ?? "") ? s : null;
 }
 
 export async function GET() {

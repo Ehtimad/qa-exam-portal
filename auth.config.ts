@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { isStaff } from "@/lib/rbac";
 
 export const authConfig = {
   pages: {
@@ -9,10 +10,11 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isAdmin = auth?.user?.role === "admin";
+      const role = auth?.user?.role as string | undefined;
+      const staff = isStaff(role);
       const path = nextUrl.pathname;
 
-      if (path.startsWith("/admin") && !isAdmin) {
+      if (path.startsWith("/admin") && !staff) {
         return Response.redirect(new URL("/dashboard", nextUrl));
       }
       if (
@@ -24,12 +26,12 @@ export const authConfig = {
       ) {
         return Response.redirect(new URL("/auth/signin", nextUrl));
       }
-      // Redirect logged-in admin directly to /admin
-      if (path === "/dashboard" && isAdmin) {
+      // Redirect logged-in staff directly to /admin
+      if (path === "/dashboard" && staff) {
         return Response.redirect(new URL("/admin", nextUrl));
       }
       if (path.startsWith("/auth/") && isLoggedIn) {
-        return Response.redirect(new URL(isAdmin ? "/admin" : "/dashboard", nextUrl));
+        return Response.redirect(new URL(staff ? "/admin" : "/dashboard", nextUrl));
       }
       return true;
     },

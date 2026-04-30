@@ -3,10 +3,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, impersonationTokens } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { canManageUsers } from "@/lib/rbac";
 
 async function requireAdmin() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") return null;
+  if (!session || !canManageUsers(session.user.role)) return null;
   return session;
 }
 

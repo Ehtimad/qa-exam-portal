@@ -3,10 +3,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { examAttempts, users } from "@/lib/schema";
 import { eq, sql } from "drizzle-orm";
+import { canViewResults } from "@/lib/rbac";
 
 export async function GET() {
   const session = await auth();
-  if (!session || session.user.role !== "admin") {
+  if (!session || !canViewResults(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

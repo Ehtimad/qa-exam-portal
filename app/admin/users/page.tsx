@@ -1,52 +1,57 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, groups } from "@/lib/schema";
-import { eq, asc } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { UserRow } from "./UserActions";
 import { Suspense } from "react";
 import UsersFilterBar from "./UsersFilterBar";
+import { canManageUsers, ROLE_LABELS, ROLE_COLORS } from "@/lib/rbac";
 
-type Student = typeof users.$inferSelect;
+type DBUser = typeof users.$inferSelect;
 type Group = typeof groups.$inferSelect;
 
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; group?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; group?: string; status?: string; role?: string }>;
 }) {
   const session = await auth();
-  if (!session || session.user.role !== "admin") redirect("/dashboard");
+  if (!session || !canManageUsers(session.user.role)) redirect("/admin");
 
-  const { q = "", group = "", status = "" } = await searchParams;
+  const { q = "", group = "", status = "", role: roleFilter = "" } = await searchParams;
 
-  let allStudents: Student[] = [];
+  let allUsers: DBUser[] = [];
   let allGroups: Group[] = [];
   let dbError = false;
 
   try {
-    allStudents = await db
-      .select()
-      .from(users)
-      .where(eq(users.role, "student"))
-      .orderBy(users.createdAt);
+    allUsers = await db.select().from(users).orderBy(asc(users.createdAt));
     allGroups = await db.select().from(groups).orderBy(asc(groups.name));
   } catch {
     dbError = true;
   }
 
-  const filtered = allStudents.filter((s) => {
-    const matchQ = !q || (s.name?.toLowerCase().includes(q.toLowerCase()) || s.email.toLowerCase().includes(q.toLowerCase()));
-    const matchGroup = !group || s.groupId === group || s.groupName === group;
-    const matchStatus = !status ||
-      (status === "pending" && !s.emailVerified) ||
-      (status === "verified" && !!s.emailVerified) ||
-      (status === "blocked" && s.isBlocked);
-    return matchQ && matchGroup && matchStatus;
-  });
+  const students   = allUsers.filter((u) => u.role === "student");
+  const staffUsers = allUsers.filter((u) => u.role !== "student");
 
-  const pendingCount = allStudents.filter((s) => !s.emailVerified).length;
+  function filterList(list: DBUser[]) {
+    return list.filter((s) => {
+      const matchQ      = !q || (s.name?.toLowerCase().includes(q.toLowerCase()) || s.email.toLowerCase().includes(q.toLowerCase()));
+      const matchGroup  = !group || s.groupId === group || s.groupName === group;
+      const matchRole   = !roleFilter || s.role === roleFilter;
+      const matchStatus = !status ||
+        (status === "pending"  && !s.emailVerified) ||
+        (status === "verified" && !!s.emailVerified) ||
+        (status === "blocked"  && s.isBlocked);
+      return matchQ && matchGroup && matchRole && matchStatus;
+    });
+  }
+
+  const filteredStudents = filterList(students);
+  const filteredStaff    = filterList(staffUsers);
+  const pendingCount     = students.filter((s) => !s.emailVerified).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -54,15 +59,15 @@ export default async function AdminUsersPage({
         <div className="max-w-6xl mx-auto flex items-center gap-6 flex-wrap">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">← Admin</Link>
           <span className="font-semibold text-gray-900">İstifadəçilər</span>
-          <Link href="/admin/results" className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
+          <Link href="/admin/results"   className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
           <Link href="/admin/questions" className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
-          <Link href="/admin/exams" className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
+          <Link href="/admin/exams"     className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
           <Link href="/admin/analytics" className="text-sm text-gray-500 hover:text-gray-900">Analitika</Link>
-          <Link href="/admin/groups" className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
+          <Link href="/admin/groups"    className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         {dbError ? (
           <div className="card text-center py-10">
             <p className="text-amber-700 font-medium mb-2">Verilənlər bazası yenilənir...</p>
@@ -70,51 +75,87 @@ export default async function AdminUsersPage({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Tələbələr</h1>
-                {pendingCount > 0 && (
-                  <p className="text-amber-700 text-sm mt-1">
-                    {pendingCount} tələbə admin təsdiqini gözləyir
-                  </p>
+            {/* ── Staff section ── */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-gray-900">Sistem İşçiləri
+                  <span className="ml-2 text-sm font-normal text-gray-400">({filteredStaff.length})</span>
+                </h2>
+              </div>
+              <div className="card overflow-hidden">
+                {filteredStaff.length === 0 ? (
+                  <p className="text-gray-400 text-sm text-center py-6">Sistem işçisi yoxdur</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50">
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Rol</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
+                          <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStaff.map((u) => (
+                          <UserRow key={u.id} student={u} showRole />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
-              <div className="text-sm text-gray-500">
-                {filtered.length} / {allStudents.length} tələbə
-              </div>
-            </div>
+            </section>
 
-            <Suspense>
-              <UsersFilterBar groups={allGroups} />
-            </Suspense>
-
-            <div className="card overflow-hidden">
-              {filtered.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-8">
-                  {allStudents.length === 0 ? "Hələ heç bir tələbə yoxdur" : "Filter nəticəsi tapılmadı"}
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Qrup</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
-                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((student) => (
-                        <UserRow key={student.id} student={student} />
-                      ))}
-                    </tbody>
-                  </table>
+            {/* ── Students section ── */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Tələbələr
+                    <span className="ml-2 text-sm font-normal text-gray-400">
+                      {filteredStudents.length} / {students.length}
+                    </span>
+                  </h2>
+                  {pendingCount > 0 && (
+                    <p className="text-amber-700 text-sm mt-0.5">{pendingCount} tələbə admin təsdiqini gözləyir</p>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+
+              <Suspense>
+                <UsersFilterBar groups={allGroups} />
+              </Suspense>
+
+              <div className="card overflow-hidden mt-3">
+                {filteredStudents.length === 0 ? (
+                  <p className="text-gray-500 text-sm text-center py-8">
+                    {students.length === 0 ? "Hələ heç bir tələbə yoxdur" : "Filter nəticəsi tapılmadı"}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50">
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Qrup</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
+                          <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStudents.map((student) => (
+                          <UserRow key={student.id} student={student} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </section>
           </>
         )}
       </div>
