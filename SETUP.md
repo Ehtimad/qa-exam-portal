@@ -9,7 +9,7 @@
 | Database | Neon PostgreSQL (Serverless) |
 | ORM | Drizzle ORM |
 | Auth | NextAuth.js v5 |
-| Real-time | Pusher (Channels) |
+| Real-time | Pusher Channels (ap2) |
 | Deploy | Vercel |
 
 ---
@@ -18,45 +18,42 @@
 
 ```bash
 # 1. Reponu klonla
-git clone <repo-url>
+git clone https://github.com/Ehtimad/qa-exam-portal.git
 cd exam-portal
 
 # 2. Paketləri qur
 npm install
 
-# 3. .env.local faylını yarat
-cp .env.example .env.local
-# Aşağıdakı dəyərləri doldurun:
-
+# 3. .env.local faylını yarat (aşağıdakı mühit dəyişənlərini əlavə et)
 # 4. Dev serveri başlat
 npm run dev
 ```
 
-→ http://localhost:3000 ünvanında açılar.  
-İlk açılışda `lib/init-db.ts` cədvəlləri yaradır, admin + 100 sualı seed edir.
+→ http://localhost:3000  
+İlk açılışda `instrumentation.ts` → `initDatabase()` — cədvəllər yaranır, admin + suallar seed edilir.
 
 ---
 
 ## 2. Mühit Dəyişənləri (`.env.local`)
 
 ```env
-# Neon PostgreSQL (neon.tech-dən alın)
-DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+# Neon PostgreSQL
+DATABASE_URL=postgresql://neondb_owner:XXXX@ep-XXXX.eu-west-2.aws.neon.tech/neondb?sslmode=require
 
 # NextAuth
 AUTH_SECRET=ən_az_32_simvol_random_string
 AUTH_URL=http://localhost:3000
 NEXTAUTH_URL=https://sizin-app.vercel.app
 
-# Pusher (pusher.com → Channels → App yaradın)
-PUSHER_APP_ID=your_app_id
-PUSHER_KEY=your_pusher_key
-PUSHER_SECRET=your_pusher_secret
-PUSHER_CLUSTER=eu
-NEXT_PUBLIC_PUSHER_KEY=your_pusher_key
-NEXT_PUBLIC_PUSHER_CLUSTER=eu
+# Pusher (ap2 cluster — quraşdırılmış)
+PUSHER_APP_ID=2149059
+PUSHER_KEY=a11d4fbad3508c00e265
+PUSHER_SECRET=1bad7423ee063bae67ed
+PUSHER_CLUSTER=ap2
+NEXT_PUBLIC_PUSHER_KEY=a11d4fbad3508c00e265
+NEXT_PUBLIC_PUSHER_CLUSTER=ap2
 
-# Admin seed (DB boş olduqda istifadə edilir)
+# Admin seed (DB boş olduqda)
 ADMIN_EMAIL=admin@exam.local
 ADMIN_PASSWORD=Admin@123
 ADMIN_NAME=Admin
@@ -66,39 +63,29 @@ ADMIN_NAME=Admin
 
 ## 3. Vercel Deploy
 
-### Addım 1: Neon DB yarat
-1. [neon.tech](https://neon.tech) → Yeni project yarat
-2. Connection string-i kopyala → `DATABASE_URL`
+### Addım 1: GitHub → Vercel
+1. [vercel.com](https://vercel.com) → Import Git Repository
+2. `Ehtimad/qa-exam-portal` seç → Deploy
 
-### Addım 2: Pusher App yarat
-1. [pusher.com](https://pusher.com) → Channels → "Create app"
-2. App Keys bölməsindən: **App ID**, **Key**, **Secret**, **Cluster** alın
-3. Vercel env vars-a əlavə edin
-
-### Addım 3: Vercel-ə deploy et
-```bash
-# Vercel CLI (istəyə bağlı)
-npm i -g vercel
-vercel
-
-# Yaxud: GitHub repo-nu Vercel-ə connect edin
-# push etdikdə avtomatik deploy
-```
-
-### Addım 4: Vercel Environment Variables
+### Addım 2: Environment Variables
 Vercel Dashboard → Project → Settings → Environment Variables:
 
 | Key | Value |
 |-----|-------|
 | `DATABASE_URL` | Neon connection string |
-| `AUTH_SECRET` | Random 32+ char string |
+| `AUTH_SECRET` | 32+ char random string |
 | `NEXTAUTH_URL` | `https://sizin-app.vercel.app` |
-| `PUSHER_APP_ID` | Pusher app id |
-| `PUSHER_KEY` | Pusher key |
-| `PUSHER_SECRET` | Pusher secret |
-| `PUSHER_CLUSTER` | `eu` (və ya sizin cluster) |
-| `NEXT_PUBLIC_PUSHER_KEY` | Pusher key (eyni) |
-| `NEXT_PUBLIC_PUSHER_CLUSTER` | `eu` (eyni) |
+| `PUSHER_APP_ID` | `2149059` |
+| `PUSHER_KEY` | `a11d4fbad3508c00e265` |
+| `PUSHER_SECRET` | `1bad7423ee063bae67ed` |
+| `PUSHER_CLUSTER` | `ap2` |
+| `NEXT_PUBLIC_PUSHER_KEY` | `a11d4fbad3508c00e265` |
+| `NEXT_PUBLIC_PUSHER_CLUSTER` | `ap2` |
+
+> **Qeyd:** Pusher credentials artıq Vercel-ə əlavə edilib (ap2 cluster).
+
+### Addım 3: Deploy
+Push etdikdə Vercel avtomatik deploy edir.
 
 ---
 
@@ -108,30 +95,24 @@ Default credentials:
 - E-poçt: `admin@exam.local`
 - Şifrə: `Admin@123`
 
-**İlk girişdən sonra dərhəl şifrəni dəyişin!**
+**İlk girişdən sonra şifrəni dəyişin!**
 
 ---
 
 ## 5. İstifadəçi Axışı
 
-### Tələbə (isStudent = true):
+### Tələbə:
 ```
-Qeydiyyat → "Tələbəsən?" toggle = ON
+Qeydiyyat → "Tələbəsən?" = ON (mavi toggle)
   ↓
-Admin /admin/users → "Təsdiqlə" düyməsi
+Admin /admin/users → "Təsdiqlə"
   ↓
-Tələbə /dashboard-a giriş edə bilir
-  ↓
-/exam → İmtahan verir
-  ↓
-/dashboard/materials → Materialları görür
-  ↓
-/messages → Mesajlaşır
+/dashboard → /exam → /dashboard/materials → /messages
 ```
 
-### Qeyri-tələbə (isStudent = false):
+### Qeyri-tələbə (işçi, reporter, və s.):
 ```
-Qeydiyyat → "Tələbəsən?" toggle = OFF
+Qeydiyyat → "Tələbəsən?" = OFF
   ↓
 Dərhal giriş (admin təsdiqi yoxdur)
 ```
@@ -157,24 +138,43 @@ Keçid balı: **70%** (350 bal)
 
 ## 7. Rol Sistemi
 
-| Rol | Kim üçün | Giriş |
-|-----|----------|-------|
-| `student` | İmtahan verənlər | Dashboard, Exam, Materials, Messages |
-| `admin` | Sistem admini | Hər yer |
-| `manager` | Kurs meneceri | Admin (geniş) |
-| `reporter` | Analitik | Nəticələr, Analytics |
-| `worker` | Sual hazırlayan | Suallar, Import |
-| `teacher` | Müəllim | Materiallar, Bildirişlər |
+| Rol | Giriş |
+|-----|-------|
+| `student` | Dashboard, Exam, Materials, Messages |
+| `admin` | Hər yer (tam giriş) |
+| `manager` | Admin (geniş) |
+| `reporter` | Nəticələr, Analytics |
+| `worker` | Suallar, Import |
+| `teacher` | Materiallar, Bildirişlər, Tələbə siyahısı |
 
 ---
 
-## 8. Yeni v5 Xüsusiyyətlər
+## 8. v5 Xüsusiyyətlər
 
-- **Real-time mesajlaşma** — Pusher ilə anlıq chat
-- **Bildiriş sistemi** — fərdi/qrup/hamıya, real-time
-- **Material planlaması** — start/end tarix, qrupa görə
-- **Elan banneri** — rol-filtrli, bağlanabilir
-- **Soft delete** — istifadəçilər silinmir, deaktiv olunur (səbəb məcburi)
-- **Teacher rolu** — materiallar + bildirişlər + tələbə siyahısı
-- **isStudent toggle** — qeydiyyatda tələbə/qeyri-tələbə seçimi
-- **Heartbeat** — hər 30s `last_seen_at` yenilənir (online statusu üçün)
+| Xüsusiyyət | Açıqlama |
+|---|---|
+| Real-time mesajlaşma | Pusher ap2 cluster, private kanallar |
+| Bildiriş sistemi | fərdi/qrup/hamıya, anlıq bell ikonu |
+| Material planlaması | start/end tarix, qrupa görə |
+| Elan banneri | rol-filtrli, bağlanabilir |
+| Soft delete | `deleted_at` + `deletion_reason`, səbəb məcburi |
+| Teacher rolu | materiallar + bildirişlər + tələbə siyahısı |
+| isStudent toggle | qeydiyyatda tələbə/qeyri-tələbə seçimi |
+| Heartbeat | hər 30s `last_seen_at` yenilənir |
+
+---
+
+## 9. DB Statusu (Neon)
+
+Mövcud data (toxunulmayıb):
+- **12 istifadəçi** (8 tələbə, 1 admin, 1 manager, digərləri)
+- **7 imtahan nəticəsi**
+- **33 sual** (DB-də), 100 sual (seed data)
+- **2 qrup**
+
+Yeni sütunlar (əlavə edilib, data pozulmayıb):
+- `users.is_student`, `users.deleted_at`, `users.deletion_reason`
+- `exams.target_type`
+
+Yeni cədvəllər (yaradılıb):
+- `materials`, `messages`, `notifications`, `advertisements`

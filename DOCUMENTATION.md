@@ -1,7 +1,7 @@
 # QA Exam Portal — Tam Sənədləşmə (v5 — LMS Upgrade)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
-> **Repo:** GitHub — MarchGroupExam/exam-portal  
+> **Repo:** GitHub — Ehtimad/qa-exam-portal  
 > **Son versiya:** v5 — Real-time mesajlaşma, materiallar, bildirişlər, elanlar, soft delete, teacher rolu
 
 ---
@@ -14,7 +14,7 @@
 | NextAuth | v5 beta | JWT autentifikasiya |
 | Drizzle ORM | 0.38.x | Type-safe DB sorğuları |
 | Neon PostgreSQL | Serverless | Əsas verilənlər bazası |
-| Pusher | — | Real-time mesajlaşma + bildirişlər |
+| Pusher Channels | — | Real-time mesajlaşma + bildirişlər |
 | pusher-js | — | Browser Pusher client |
 | TailwindCSS | 3.x | UI stilləmə |
 | jsPDF + autotable | — | PDF generasiyası |
@@ -99,13 +99,13 @@ email_verified TIMESTAMPTZ
 image TEXT
 password TEXT
 role TEXT DEFAULT 'student'          -- student|admin|manager|reporter|worker|teacher
-group_name TEXT                       -- legacy (köhnə sütun)
+group_name TEXT                       -- legacy
 group_id TEXT → groups(id)
 is_blocked BOOLEAN DEFAULT false
-is_student BOOLEAN DEFAULT true      -- v5: tələbə/işçi fərqi
+is_student BOOLEAN DEFAULT true      -- qeydiyyatda toggle ilə təyin edilir
 last_seen_at TIMESTAMPTZ             -- heartbeat (30s interval)
-deleted_at TIMESTAMPTZ               -- v5: soft delete
-deletion_reason TEXT                 -- v5: silmə səbəbi
+deleted_at TIMESTAMPTZ               -- soft delete tarixi
+deletion_reason TEXT                 -- silmə səbəbi (admin tərəfindən məcburi)
 created_at TIMESTAMPTZ
 ```
 
@@ -140,7 +140,7 @@ time_limit_minutes INTEGER
 is_active BOOLEAN DEFAULT false
 shuffle_questions BOOLEAN DEFAULT true
 shuffle_options BOOLEAN DEFAULT true
-target_type TEXT DEFAULT 'all'       -- v5: 'all' | 'student' | 'non-student'
+target_type TEXT DEFAULT 'all'        -- 'all' | 'student' | 'non-student'
 created_at TIMESTAMPTZ
 ```
 
@@ -184,19 +184,19 @@ started_at TIMESTAMPTZ
 completed_at TIMESTAMPTZ
 ```
 
-### `materials` *(v5)*
+### `materials`
 ```sql
 id TEXT PRIMARY KEY
 title TEXT NOT NULL
-content_url TEXT NOT NULL            -- material linki
+content_url TEXT NOT NULL
 group_id TEXT → groups(id)           -- NULL = bütün qruplar
-start_date TIMESTAMPTZ DEFAULT NOW() -- görünmə başlama tarixi
+start_date TIMESTAMPTZ DEFAULT NOW()
 end_date TIMESTAMPTZ                 -- NULL = limitsiz
 created_by TEXT → users(id)
 created_at TIMESTAMPTZ
 ```
 
-### `messages` *(v5)*
+### `messages`
 ```sql
 id TEXT PRIMARY KEY
 sender_id TEXT → users(id) ON DELETE CASCADE
@@ -206,7 +206,7 @@ is_read BOOLEAN DEFAULT false
 created_at TIMESTAMPTZ
 ```
 
-### `notifications` *(v5)*
+### `notifications`
 ```sql
 id TEXT PRIMARY KEY
 user_id TEXT → users(id)             -- NULL = group/all bildirişi
@@ -218,7 +218,7 @@ is_read BOOLEAN DEFAULT false
 created_at TIMESTAMPTZ
 ```
 
-### `advertisements` *(v5)*
+### `advertisements`
 ```sql
 id TEXT PRIMARY KEY
 title TEXT NOT NULL
@@ -249,17 +249,17 @@ exam-portal/
 │   │
 │   ├── auth/
 │   │   ├── signin/page.tsx               # Giriş
-│   │   ├── register/page.tsx             # Qeydiyyat (isStudent toggle ilə)
-│   │   └── impersonate/page.tsx          # Admin impersonation token handler
+│   │   ├── register/page.tsx             # Qeydiyyat (isStudent toggle)
+│   │   └── impersonate/page.tsx          # Admin impersonation
 │   │
 │   ├── dashboard/
-│   │   ├── page.tsx                      # Tələbə kabinetı (Heartbeat, AdsBanner, NotificationBell)
-│   │   ├── materials/page.tsx            # v5: Tələbə materialları (tarix-filtrli)
+│   │   ├── page.tsx                      # Tələbə kabinetı (Heartbeat, AdsBanner, Bell)
+│   │   ├── materials/page.tsx            # Tələbə materialları (tarix-filtrli)
 │   │   └── results/[id]/page.tsx         # Detallı nəticə + PDF/sertifikat
 │   │
 │   ├── messages/
-│   │   ├── page.tsx                      # v5: Real-time chat (server wrapper)
-│   │   └── MessagesClient.tsx            # v5: Pusher ilə chat UI
+│   │   ├── page.tsx                      # Real-time chat (server wrapper)
+│   │   └── MessagesClient.tsx            # Pusher ilə chat UI
 │   │
 │   ├── exam/
 │   │   ├── page.tsx
@@ -274,341 +274,277 @@ exam-portal/
 │   │   └── [id]/page.tsx
 │   │
 │   ├── admin/
-│   │   ├── page.tsx                      # Dashboard
+│   │   ├── page.tsx
 │   │   ├── users/
 │   │   │   ├── page.tsx
-│   │   │   ├── UserActions.tsx           # v5: SoftDeleteModal (səbəb tələb edir)
+│   │   │   ├── UserActions.tsx           # SoftDeleteModal (səbəb məcburi)
 │   │   │   └── UsersFilterBar.tsx
 │   │   ├── results/
 │   │   ├── questions/
 │   │   ├── exams/
 │   │   ├── groups/
 │   │   ├── analytics/
-│   │   ├── materials/                    # v5: Admin material CRUD
+│   │   ├── materials/                    # Material CRUD
 │   │   │   ├── page.tsx
 │   │   │   └── MaterialsClient.tsx
-│   │   ├── notifications/                # v5: Bildiriş göndərmə
+│   │   ├── notifications/                # Bildiriş göndərmə
 │   │   │   ├── page.tsx
 │   │   │   └── NotificationsAdminClient.tsx
-│   │   └── advertisements/               # v5: Elan CRUD
+│   │   └── advertisements/               # Elan CRUD
 │   │       ├── page.tsx
 │   │       └── AdsClient.tsx
 │   │
 │   └── api/
 │       ├── auth/[...nextauth]/route.ts
-│       ├── register/route.ts             # v5: isStudent flag dəstəyi
+│       ├── register/route.ts             # isStudent flag
 │       ├── groups/route.ts
-│       │
-│       ├── exam/...
-│       │
+│       ├── exam/ ...
 │       ├── user/
 │       │   ├── profile/route.ts
-│       │   ├── heartbeat/route.ts        # last_seen_at yenilə (30s)
+│       │   ├── heartbeat/route.ts
 │       │   ├── result/[id]/route.ts
 │       │   └── certificate/[id]/route.ts
-│       │
-│       ├── verify/[id]/route.ts
-│       │
-│       ├── messages/                     # v5: Real-time mesajlaşma
-│       │   ├── route.ts                  # GET (söhbət), POST (göndər)
-│       │   └── contacts/route.ts         # GET (istifadəçi siyahısı + unread)
-│       │
-│       ├── materials/route.ts            # v5: GET (cari user üçün filtrli)
-│       │
-│       ├── notifications/route.ts        # v5: GET (user bildirişləri), PATCH (oxundu)
-│       │
-│       ├── advertisements/route.ts       # v5: GET (aktiv elanlar, rol-filtrli)
-│       │
-│       ├── pusher/
-│       │   └── auth/route.ts             # v5: Pusher channel auth
-│       │
+│       ├── verify/[id]/route.ts          # PUBLIC
+│       ├── messages/
+│       │   ├── route.ts
+│       │   └── contacts/route.ts
+│       ├── materials/route.ts
+│       ├── notifications/route.ts
+│       ├── advertisements/route.ts
+│       ├── pusher/auth/route.ts
 │       └── admin/
-│           ├── users/
-│           │   ├── route.ts
-│           │   └── [id]/
-│           │       ├── route.ts          # v5: DELETE → soft delete (səbəb tələb edir)
-│           │       └── impersonate/route.ts
-│           ├── results/...
-│           ├── questions/...
-│           ├── exams/...
-│           ├── groups/...
-│           ├── materials/                # v5: Admin material CRUD
-│           │   ├── route.ts
-│           │   └── [id]/route.ts
-│           ├── notifications/route.ts    # v5: Bildiriş göndər + siyahı
-│           ├── advertisements/           # v5: Elan CRUD
-│           │   ├── route.ts
-│           │   └── [id]/route.ts
-│           └── export/...
+│           ├── users/ [id]/ impersonate/
+│           ├── results/
+│           ├── questions/
+│           ├── exams/
+│           ├── groups/
+│           ├── materials/ [id]/
+│           ├── notifications/
+│           ├── advertisements/ [id]/
+│           └── export/
 │
 ├── components/
-│   ├── Heartbeat.tsx                     # v5: 30s interval, last_seen_at yenilə
-│   ├── NotificationBell.tsx              # v5: Bell + unread badge, Pusher real-time
-│   ├── AdsBanner.tsx                     # v5: Rol-filtrli elan banneri
-│   └── ui/
-│       └── PasswordInput.tsx
+│   ├── Heartbeat.tsx                     # 30s interval, last_seen_at yenilə
+│   ├── NotificationBell.tsx              # Bell + unread badge, Pusher real-time
+│   ├── AdsBanner.tsx                     # Rol-filtrli elan banneri
+│   └── ui/PasswordInput.tsx
 │
 └── lib/
-    ├── auth.ts                           # v5: soft delete yoxlaması, teacher staff
+    ├── auth.ts                           # soft delete yoxlaması, teacher staff
     ├── auth.config.ts
     ├── db.ts
-    ├── init-db.ts                        # v5: yeni sütun+cədvəl migrasiyanları
-    ├── schema.ts                         # v5: 4 yeni cədvəl, yeni sütunlar
-    ├── rbac.ts                           # v5: teacher rolu, yeni icazə funksiyaları
-    ├── pusher.ts                         # v5: Server Pusher client
-    ├── pusher-client.ts                  # v5: Browser Pusher client (singleton)
+    ├── init-db.ts                        # DB init + migrasiyanlar (safe ALTER TABLE)
+    ├── schema.ts                         # Drizzle cədvəl definisiyaları
+    ├── rbac.ts                           # 6 rol, bütün icazə funksiyaları
+    ├── pusher.ts                         # Server Pusher client
+    ├── pusher-client.ts                  # Browser Pusher client (singleton)
     ├── scoring.ts
     └── questions.ts
 ```
 
 ---
 
-## 5. Bütün Funksiyalar (Son Versiya v5)
+## 5. Bütün Funksiyalar
 
 ### 5.1 İctimai Səhifələr
 
 #### Ana Səhifə (`/`)
 - Hero bölməsi, qeydiyyat/giriş düymələri
-- Sertifikat yoxlama formu
-- Statistika kartları
+- Sertifikat yoxlama formu (ID daxil et)
 
 #### Sertifikat Doğrulama (`/verify/[id]`)
-- **Keçibsə:** yaşıl kart — ad, qrup, bal, faiz, tarix, ID
-- **Keçməyibsə / tapılmadısa:** qırmızı kart — səbəb
+- **Keçibsə:** yaşıl kart — ad, qrup, bal, faiz, tarix
+- **Tapılmadısa:** qırmızı kart
 
 ---
 
 ### 5.2 Tələbə Funksiyaları
 
-#### Qeydiyyat (`/auth/register`) — *v5 yeniləndi*
-- **"Tələbəsən?"** toggle (default: Bəli)
-- `isStudent = true` → `email_verified = NULL` → admin təsdiqi gözlənilir
-- `isStudent = false` → `email_verified = NOW()` → dərhal giriş
-- Qrup dropdown DB-dən yüklənir
+#### Qeydiyyat (`/auth/register`)
+- **"Tələbəsən?"** mavi toggle
+- `isStudent = true` → admin təsdiqi gözlənilir (`email_verified = NULL`)
+- `isStudent = false` → dərhal giriş (`email_verified = NOW()`)
 
-#### Tələbə Kabinetı (`/dashboard`) — *v5 yeniləndi*
-- **Heartbeat:** Hər 30 saniyədə `POST /api/user/heartbeat` — `last_seen_at` yenilənir
-- **AdsBanner:** Rol-filtrli aktiv elanlar göstərilir (bağlanabilir)
-- **NotificationBell:** Zəng ikonu, oxunmamış bildiriş sayı badge, Pusher real-time
-- **Materiallar linki:** `/dashboard/materials`
-- **Mesajlar linki:** `/messages`
+#### Tələbə Kabinetı (`/dashboard`)
+- Heartbeat hər 30s — `last_seen_at` yenilənir
+- Rol-filtrli AdsBanner (bağlanabilir)
+- NotificationBell — zəng ikonu, unread badge, real-time
+- Materiallar + Mesajlar nav linkləri
 
-#### Materiallar (`/dashboard/materials`) — *v5 yeni*
-- Cari tarixdə aktiv materiallar (startDate ≤ NOW() ≤ endDate)
-- Qrupa aid materiallar + hamıya açıq materiallar
-- Hər material xarici linkdə açılır
+#### Materiallar (`/dashboard/materials`)
+- `startDate ≤ NOW() ≤ endDate` filtrli
+- Qrupa aid + hamıya açıq materiallar
 
-#### Real-time Mesajlaşma (`/messages`) — *v5 yeni*
-- Sol panel: bütün istifadəçilər, oxunmamış sayı badge
-- Sağ panel: söhbət bölməsi
-- Pusher `private-user-{id}` kanalı ilə anlıq çatdırılma
-- Enter ilə göndər
-- Oxundu markası
+#### Real-time Mesajlaşma (`/messages`)
+- Pusher `private-user-{id}` kanalı
+- Sol: istifadəçi siyahısı + unread badge
+- Sağ: söhbət, Enter ilə göndər
 
-#### Bildirişlər — *v5 yeni*
+#### Bildirişlər
 - Dashboard nav-da zəng ikonu
-- Real-time Pusher ilə gəlir
-- Tıklayanda oxundu olaraq işarələnir
-- 3 növ: fərdi, qrupa, hamıya
+- Real-time Pusher, oxundu markası
 
 ---
 
-### 5.3 Soft Delete (İstifadəçi Silmə) — *v5 yeni*
+### 5.3 Soft Delete
 
 ```
-Admin → İstifadəçilər → [sətir] → "Sil" düyməsi
-  → Modal açılır: "Silmə səbəbini daxil edin"
-  → Səbəb boş olarsa → xəta
+Admin → İstifadəçilər → Sil
+  → Modal: "Silmə səbəbini daxil edin" (məcburi)
   → DELETE /api/admin/users/[id]  { reason: "..." }
   → users.deleted_at = NOW(), users.deletion_reason = reason
-  → Cədvəldə "Silinmiş" etiketi, bütün düymələr gizlənir
-```
-
-**Əsas fərq:** Köhnə versiyada hard delete (sıradından çıxarılırdı). İndi soft delete — data qalır, giriş bloklanır.
-
-**Avtomatik blok:** `lib/auth.ts`-də `deletedAt !== null` yoxlaması — login cəhdi rədd edilir.
-
----
-
-### 5.4 Material Sistemi — *v5 yeni*
-
-#### Admin Material İdarəetməsi (`/admin/materials`)
-- Başlıq, URL, qrup (boş = hamıya), başlanğıc tarixi, bitmə tarixi
-- Redaktə, sil
-- `canManageMaterials` icazəsi: admin, manager, teacher
-
-#### Tarix Filtri
-```
-startDate ≤ NOW() ≤ endDate (endDate NULL olarsa limitsiz)
+  → Auth.ts login-i bloklar (deleted_at !== null)
 ```
 
 ---
 
-### 5.5 Bildiriş Sistemi — *v5 yeni*
+### 5.4 Material Sistemi
 
-#### Göndərmə (`/admin/notifications`)
-- **Hamıya:** `type = "all"` → Pusher `notifications` kanalı
-- **Qrupa:** `type = "group"` + `groupId` → Pusher `group-{groupId}` kanalı
-- **Fərdi:** `type = "individual"` + `userId` → Pusher `private-user-{userId}` kanalı
+#### Admin (`/admin/materials`)
+- Başlıq, URL, qrup, başlanğıc/bitmə tarixi
+- `canManageMaterials`: admin, manager, teacher
 
-#### Qəbul
-- `NotificationBell` komponenti real-time Pusher ilə dinləyir
-- DB-dən son 50 bildiriş yüklənir
-- Oxundu toggle: `PATCH /api/notifications`
+#### Tələbə görünüşü
+- Yalnız aktiv (tarix aralığında) materiallar
 
 ---
 
-### 5.6 Elan Sistemi — *v5 yeni*
+### 5.5 Bildiriş Sistemi
 
-#### Admin Elan İdarəetməsi (`/admin/advertisements`)
-- Başlıq, mətn, hədəf rol (`all`, `student`, digər rollar), aktiv/deaktiv
-- Toggle ilə sürətli aktiv/deaktiv
-- `canManageAds` icazəsi: admin, manager
-
-#### Göstərilmə
-- `AdsBanner` komponenti dashboard-da yüklənir
-- `GET /api/advertisements` → rola görə filtrli aktiv elanlar
-- Hər elanı bağlamaq olar (session state-da dismiss)
+| Növ | Hədəf | Pusher kanalı |
+|---|---|---|
+| `all` | Hamıya | `notifications` |
+| `group` | Qrupa | `group-{groupId}` |
+| `individual` | Fərdi | `private-user-{userId}` |
 
 ---
 
-### 5.7 Real-time Arxitektura (Pusher) — *v5 yeni*
+### 5.6 Elan Sistemi
+
+- Rol-filtrli: `all`, `student`, digər rollar
+- Toggle: aktiv/deaktiv
+- `AdsBanner`: dashboard-da, bağlanabilir
+
+---
+
+### 5.7 Real-time Arxitektura (Pusher)
 
 ```
-Göndərici → API Route → pusher.trigger() → Pusher cloud → pusher-js → Browser
+Server → pusher.trigger() → Pusher cloud (ap2) → pusher-js → Browser
 ```
 
-**Kanallar:**
-| Kanal | Məqsəd |
-|---|---|
-| `private-user-{userId}` | Fərdi mesaj + bildiriş |
-| `group-{groupId}` | Qrup bildirişi |
-| `notifications` | Hamıya broadcast |
-
-**Tələb olunan env vars:**
-```env
-PUSHER_APP_ID=...
-PUSHER_KEY=...
-PUSHER_SECRET=...
-PUSHER_CLUSTER=eu
-NEXT_PUBLIC_PUSHER_KEY=...
-NEXT_PUBLIC_PUSHER_CLUSTER=eu
+**Quraşdırılmış credentials:**
+```
+PUSHER_APP_ID = 2149059
+PUSHER_KEY    = a11d4fbad3508c00e265
+PUSHER_CLUSTER = ap2
 ```
 
 ---
 
-### 5.8 İmtahan Məntiqi (Dəyişməyib)
+### 5.8 İmtahan Məntiqi
 
 #### Sessiya Axını
 ```
 /exam GET
   └─ Mövcud in_progress sessiya? → davam et
   └─ Aktiv exam (qrupa görə, sonra global)
-  └─ exam_questions-dan suallar
-  └─ question_groups M2M (fallback)
-  └─ Bütün suallar (fallback)
+  └─ Dinamik MAX = SUM(questions.points)
+  └─ Shuffle suallar + seçimlər
   └─ Yeni exam_session yarat
 ```
 
-#### Dinamik Maksimum Bal
-```
-SUM(questions.points) aktiv imtahan suallarından
-```
+#### Sessiya Bərpası
+- `elapsed_seconds` DB-yə yazılır → taymer bərpası
+
+#### Anti-Cheat
+- `window.blur` → `tabSwitches++` → DB-yə yazılır
 
 ---
 
 ### 5.9 PDF və Export
 
-| Fayl | URL | Giriş | Məzmun |
-|---|---|---|---|
-| Admin nəticə PDF | `GET /api/admin/export/pdf` | admin, manager, reporter | Bütün nəticələr |
-| Excel export | `GET /api/admin/export/results` | admin, manager, reporter | `.xlsx` |
-| Şəxsi nəticə PDF | `GET /api/user/result/[id]` | Öz nəticəsi | Sual-cavab |
-| Sertifikat PDF | `GET /api/user/certificate/[id]` | Öz nəticəsi ≥70% | Dekorativ |
+| Fayl | URL | Giriş |
+|---|---|---|
+| Admin nəticə PDF | `GET /api/admin/export/pdf` | reporter+ |
+| Excel export | `GET /api/admin/export/results` | reporter+ |
+| Şəxsi nəticə PDF | `GET /api/user/result/[id]` | Öz nəticəsi |
+| Sertifikat PDF | `GET /api/user/certificate/[id]` | ≥70% |
 
----
-
-### 5.10 Sertifikat Doğrulama
-
-- **ID:** `exam_attempts.id` (UUID)
-- **PDF alt hissəsi:** `Yoxlama: https://...vercel.app/verify/[id]`
-- **Public API:** `GET /api/verify/[id]` — auth yoxdur
+**Sertifikat alt hissəsi:**
+- `Sertifikat ID: [uuid]`
+- `Yoxlama: https://exam-portal-nine-azure.vercel.app/verify/[id]`
 
 ---
 
 ## 6. API Cədvəli (Tam — v5)
 
-### Public (auth yoxdur)
+### Public
 | Method | URL | Açıqlama |
 |---|---|---|
 | GET | `/api/verify/[id]` | Sertifikat doğrulama |
 | GET | `/api/groups` | Qrup siyahısı |
 
-### Auth tələb edən (student+)
+### Auth tələb edən
 | Method | URL | Açıqlama |
 |---|---|---|
 | POST | `/api/register` | Qeydiyyat (isStudent flag) |
-| GET,POST | `/api/messages` | Söhbət yüklə / mesaj göndər |
-| GET | `/api/messages/contacts` | İstifadəçi siyahısı + unread |
-| GET | `/api/materials` | Aktiv materiallar (tarix-filtrli) |
-| GET | `/api/notifications` | İstifadəçi bildirişləri |
+| GET,POST | `/api/messages` | Söhbət yüklə / göndər |
+| GET | `/api/messages/contacts` | İstifadəçilər + unread |
+| GET | `/api/materials` | Aktiv materiallar |
+| GET | `/api/notifications` | Bildirişlər |
 | PATCH | `/api/notifications` | Oxundu işarələ |
-| GET | `/api/advertisements` | Aktiv elanlar (rol-filtrli) |
-| POST | `/api/pusher/auth` | Pusher kanal autentifikasiyası |
+| GET | `/api/advertisements` | Aktiv elanlar |
+| POST | `/api/pusher/auth` | Pusher kanal auth |
 | POST | `/api/user/heartbeat` | last_seen_at yenilə |
-| GET,POST | `/api/exam/session` | Exam sessiya |
 | POST | `/api/exam/save` | Cavabları saxla |
 | POST | `/api/exam/submit` | İmtahanı bitir |
 | PUT | `/api/user/profile` | Profil yenilə |
-| GET | `/api/user/result/[id]` | Nəticə PDF |
 | GET | `/api/user/certificate/[id]` | Sertifikat PDF |
 
-### Admin API (rol-based)
-| Method | URL | İcazə | Açıqlama |
-|---|---|---|---|
-| GET | `/api/admin/users` | admin | İstifadəçi siyahısı |
-| PATCH | `/api/admin/users` | admin | verify/block/unblock |
-| PUT | `/api/admin/users/[id]` | admin | Yenilə (rol, qrup, şifrə) |
-| DELETE | `/api/admin/users/[id]` | admin | Soft delete (reason tələb olunur) |
-| POST | `/api/admin/users/[id]/impersonate` | admin | Token yarat |
-| GET,POST | `/api/admin/questions` | worker+ | Sual CRUD |
-| GET,PUT,DELETE | `/api/admin/questions/[id]` | worker+ | Sual CRUD |
-| GET,PUT | `/api/admin/questions/[id]/groups` | worker+ | Qrup təyinatı |
-| POST | `/api/admin/questions/import` | worker+ | CSV import |
-| GET | `/api/admin/questions/template` | worker+ | Şablon |
-| GET,POST | `/api/admin/exams` | manager+ | İmtahan CRUD |
-| GET,PUT,DELETE | `/api/admin/exams/[id]` | manager+ | İmtahan CRUD |
-| GET,POST | `/api/admin/groups` | manager+ | Qrup CRUD |
-| PUT,DELETE | `/api/admin/groups/[id]` | manager+ | Qrup CRUD |
-| GET | `/api/admin/results` | reporter+ | Nəticə siyahısı |
-| GET,DELETE | `/api/admin/results/[id]` | reporter+ | Nəticə detail/reset |
-| GET | `/api/admin/export/results` | reporter+ | Excel export |
-| GET | `/api/admin/export/pdf` | reporter+ | PDF export |
-| GET,POST | `/api/admin/materials` | teacher+ | Material CRUD |
-| PUT,DELETE | `/api/admin/materials/[id]` | teacher+ | Material CRUD |
-| GET,POST | `/api/admin/notifications` | teacher+ | Bildiriş göndər/siyahı |
-| GET,POST | `/api/admin/advertisements` | manager+ | Elan CRUD |
-| PUT,DELETE | `/api/admin/advertisements/[id]` | manager+ | Elan CRUD |
+### Admin API
+| Method | URL | İcazə |
+|---|---|---|
+| GET | `/api/admin/users` | admin |
+| PATCH | `/api/admin/users` | admin |
+| PUT | `/api/admin/users/[id]` | admin |
+| DELETE | `/api/admin/users/[id]` | admin (reason məcburi) |
+| POST | `/api/admin/users/[id]/impersonate` | admin |
+| GET,POST | `/api/admin/questions` | worker+ |
+| GET,PUT,DELETE | `/api/admin/questions/[id]` | worker+ |
+| GET,PUT | `/api/admin/questions/[id]/groups` | worker+ |
+| POST | `/api/admin/questions/import` | worker+ |
+| GET,POST | `/api/admin/exams` | manager+ |
+| GET,PUT,DELETE | `/api/admin/exams/[id]` | manager+ |
+| GET,POST | `/api/admin/groups` | manager+ |
+| PUT,DELETE | `/api/admin/groups/[id]` | manager+ |
+| GET | `/api/admin/results` | reporter+ |
+| GET,DELETE | `/api/admin/results/[id]` | reporter+ |
+| GET | `/api/admin/export/results` | reporter+ |
+| GET | `/api/admin/export/pdf` | reporter+ |
+| GET,POST | `/api/admin/materials` | teacher+ |
+| PUT,DELETE | `/api/admin/materials/[id]` | teacher+ |
+| GET,POST | `/api/admin/notifications` | teacher+ |
+| GET,POST | `/api/admin/advertisements` | manager+ |
+| PUT,DELETE | `/api/admin/advertisements/[id]` | manager+ |
 
 ---
 
-## 7. Admin Panel Səhifələri (v5)
+## 7. Admin Panel Səhifələri
 
 | URL | Giriş | Funksiya |
 |---|---|---|
 | `/admin` | Bütün staff | Dashboard |
 | `/admin/users` | admin | İstifadəçilər (soft delete, 6 rol) |
 | `/admin/results` | reporter+ | Nəticələr, filter, export |
-| `/admin/results/[id]` | reporter+ | Detallı nəticə |
-| `/admin/questions` | worker+ | Suallar CRUD, import |
+| `/admin/questions` | worker+ | CRUD, import |
 | `/admin/exams` | manager+ | İmtahanlar CRUD |
-| `/admin/exams/[id]` | manager+ | İmtahan suallarını idarə et |
 | `/admin/groups` | manager+ | Qruplar CRUD |
 | `/admin/analytics` | reporter+ | Online users, xəta analizi |
 | `/admin/materials` | teacher+ | Material CRUD, tarix planlaması |
-| `/admin/notifications` | teacher+ | Bildiriş göndər (hamıya/qrupa/fərdi) |
-| `/admin/advertisements` | manager+ | Elan CRUD, aktiv/deaktiv |
-| `/messages` | Hamı | Real-time chat (admin + tələbə) |
+| `/admin/notifications` | teacher+ | Bildiriş göndər |
+| `/admin/advertisements` | manager+ | Elan CRUD |
+| `/messages` | Hamı | Real-time chat |
 
 ---
 
@@ -619,19 +555,19 @@ SUM(questions.points) aktiv imtahan suallarından
 DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
 
 # NextAuth
-AUTH_SECRET=random-secret-min-32-chars
+AUTH_SECRET=random-32-char-string
 AUTH_URL=http://localhost:3000
 NEXTAUTH_URL=https://exam-portal-nine-azure.vercel.app
 
-# Pusher (pusher.com dashboard-dan alın)
-PUSHER_APP_ID=your_app_id
-PUSHER_KEY=your_pusher_key
-PUSHER_SECRET=your_pusher_secret
-PUSHER_CLUSTER=eu
-NEXT_PUBLIC_PUSHER_KEY=your_pusher_key
-NEXT_PUBLIC_PUSHER_CLUSTER=eu
+# Pusher (ap2 cluster)
+PUSHER_APP_ID=2149059
+PUSHER_KEY=a11d4fbad3508c00e265
+PUSHER_SECRET=1bad7423ee063bae67ed
+PUSHER_CLUSTER=ap2
+NEXT_PUBLIC_PUSHER_KEY=a11d4fbad3508c00e265
+NEXT_PUBLIC_PUSHER_CLUSTER=ap2
 
-# Admin seed (DB boş olduqda)
+# Admin seed
 ADMIN_EMAIL=admin@exam.local
 ADMIN_PASSWORD=Admin@123
 ADMIN_NAME=Admin
@@ -639,27 +575,26 @@ ADMIN_NAME=Admin
 
 ---
 
-## 9. Deployment
+## 9. Deployment (Vercel)
 
-### Vercel
 1. GitHub-a push → Vercel avtomatik deploy
-2. Dashboard → Settings → Environment Variables → yuxarıdakıları əlavə et
-3. İlk deploy: `lib/init-db.ts` bütün cədvəlləri yaradır, yeni sütunları əlavə edir
+2. Vercel Dashboard → Settings → Environment Variables-a yuxarıdakıları əlavə et
+3. İlk deploy: `instrumentation.ts` → `initDatabase()` — bütün cədvəllər, sütunlar yaranır
 
-### Pusher quraşdırma
-1. [pusher.com](https://pusher.com) → App yaradın (Channels)
-2. App Keys bölməsindən: App ID, Key, Secret, Cluster alın
-3. Vercel env vars-a əlavə edin
+### DB Migration qeydi
+Yeni sütunlar (`is_student`, `deleted_at`, `deletion_reason`) artıq Neon DB-yə əlavə edilib.  
+Yeni cədvəllər (`materials`, `messages`, `notifications`, `advertisements`) yaradılıb.  
+Mövcud data (12 user, 7 nəticə) toxunulmayıb.
 
 ---
 
 ## 10. Əsas Qeydlər
 
 - **Mövcud data qorunur:** `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-- **Soft delete:** `deleted_at` + `deletion_reason` — hard delete yoxdur, admin məcburi səbəb yazmalıdır
-- **isStudent flag:** Qeydiyyatda toggle — `true` → admin təsdiqi, `false` → dərhal giriş
-- **Heartbeat:** Hər 30s `Heartbeat` komponenti `POST /api/user/heartbeat` çağırır
-- **Teacher rolu:** staff kimi giriş edir, materiallar + bildirişlər + tələbə siyahısı
-- **Sertifikat ID:** `exam_attempts.id` (UUID) — həm PDF-də, həm `/verify/[id]`-də
-- **Pusher private kanallar:** `pusher/auth/route.ts` autentifikasiya edir
-- **Tab-switch:** `window.blur` — imtahan zamanı sayılır, nəticədə göstərilir
+- **Soft delete:** `deleted_at` + `deletion_reason` — admin məcburi səbəb yazır; hard delete yoxdur
+- **isStudent flag:** qeydiyyatda toggle — `true` → admin təsdiqi, `false` → dərhal giriş
+- **Heartbeat:** hər 30s `POST /api/user/heartbeat` — online status üçün
+- **Teacher rolu:** staff kimi giriş, materiallar + bildirişlər + tələbə siyahısı
+- **Pusher cluster:** ap2 (Asia Pacific)
+- **Sertifikat ID:** `exam_attempts.id` (UUID)
+- **Tab-switch:** `window.blur` → imtahan zamanı sayılır
