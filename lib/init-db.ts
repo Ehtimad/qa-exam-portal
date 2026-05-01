@@ -38,8 +38,8 @@ export async function initDatabase() {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT false`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`;
 
-  // Existing users (created before verification requirement) → auto-verify
-  await sql`UPDATE users SET email_verified = created_at WHERE email_verified IS NULL`;
+  // Auto-verify only staff accounts (non-students) that predate verification requirement
+  await sql`UPDATE users SET email_verified = created_at WHERE email_verified IS NULL AND role != 'student'`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS accounts (
