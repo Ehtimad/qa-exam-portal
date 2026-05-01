@@ -160,6 +160,59 @@ export async function initDatabase() {
   await sql`ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS question_order TEXT`;
   await sql`ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS option_orders TEXT`;
 
+  // ── LMS upgrade migrations ────────────────────────────────────────────
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_student BOOLEAN NOT NULL DEFAULT true`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_reason TEXT`;
+  await sql`ALTER TABLE exams ADD COLUMN IF NOT EXISTS target_type TEXT NOT NULL DEFAULT 'all'`;
+
+  // Sync is_student flag: non-student roles → false
+  await sql`UPDATE users SET is_student = false WHERE role IN ('admin','manager','reporter','worker','teacher') AND is_student = true`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS materials (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content_url TEXT NOT NULL,
+      group_id TEXT REFERENCES groups(id) ON DELETE CASCADE,
+      start_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      end_date TIMESTAMPTZ,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      receiver_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      is_read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      group_id TEXT REFERENCES groups(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'all',
+      is_read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS advertisements (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      target_role TEXT NOT NULL DEFAULT 'all',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
   // ── Seed admin ───────────────────────────────────────────────────────
   const [adminRow] = await sql`SELECT count(*)::int AS c FROM users WHERE role='admin'`;
   if ((adminRow.c as number) === 0) {

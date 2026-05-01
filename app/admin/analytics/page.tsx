@@ -125,6 +125,10 @@ export default async function AdminAnalyticsPage() {
           <Link href="/admin/questions" className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
           <Link href="/admin/exams" className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
           <Link href="/admin/groups" className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
+          <Link href="/admin/materials" className="text-sm text-gray-500 hover:text-gray-900">Materiallar</Link>
+          <Link href="/admin/notifications" className="text-sm text-gray-500 hover:text-gray-900">Bildirişlər</Link>
+          <Link href="/admin/advertisements" className="text-sm text-gray-500 hover:text-gray-900">Elanlar</Link>
+          <Link href="/messages" className="text-sm text-gray-500 hover:text-gray-900">Mesajlar</Link>
         </div>
       </nav>
 

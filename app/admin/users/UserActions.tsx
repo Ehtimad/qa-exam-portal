@@ -16,9 +16,10 @@ interface User {
   emailVerified: Date | string | null;
   isBlocked: boolean;
   createdAt: Date | string;
+  deletedAt?: Date | string | null;
 }
 
-const ALL_ROLES = ["student", "admin", "manager", "reporter", "worker"] as const;
+const ALL_ROLES = ["student", "admin", "manager", "reporter", "worker", "teacher"] as const;
 
 export function EditUserModal({ user, onClose }: { user: User; onClose: () => void }) {
   const router = useRouter();
@@ -117,13 +118,65 @@ export function EditUserModal({ user, onClose }: { user: User; onClose: () => vo
   );
 }
 
+function SoftDeleteModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const router = useRouter();
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleDelete() {
+    if (!reason.trim()) { setError("Səbəb daxil edin"); return; }
+    setLoading(true);
+    const res = await fetch(`/api/admin/users/${user.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason.trim() }),
+    });
+    setLoading(false);
+    if (res.ok) {
+      router.refresh();
+      onClose();
+    } else {
+      const d = await res.json();
+      setError(d.error ?? "Xəta baş verdi");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">İstifadəçini sil</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          <strong>{user.name ?? user.email}</strong> hesabı deaktiv ediləcək. Silmə səbəbini daxil edin.
+        </p>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={3}
+          placeholder="Məs: Müqavilə bitdi, spam hesabı..."
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+        />
+        {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+        <div className="flex gap-3 mt-4">
+          <button onClick={handleDelete} disabled={loading}
+            className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+            {loading ? "Silinir..." : "Sil"}
+          </button>
+          <button onClick={onClose} className="btn-secondary flex-1">Ləğv et</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function UserRow({ student, showRole }: { student: User; showRole?: boolean }) {
   const router = useRouter();
   const [showEdit, setShowEdit] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const isVerified = !!student.emailVerified;
+  const isDeleted = !!student.deletedAt;
 
   async function doAction(action: string) {
     setActionLoading(action);
@@ -133,13 +186,6 @@ export function UserRow({ student, showRole }: { student: User; showRole?: boole
       body: JSON.stringify({ userId: student.id, action }),
     });
     setActionLoading(null);
-    router.refresh();
-  }
-
-  async function handleDelete() {
-    if (!confirm(`"${student.name ?? student.email}" istifadəçisini silmək istədiyinizə əminsiniz?`)) return;
-    setDeleting(true);
-    await fetch(`/api/admin/users/${student.id}`, { method: "DELETE" });
     router.refresh();
   }
 
@@ -157,12 +203,12 @@ export function UserRow({ student, showRole }: { student: User; showRole?: boole
   return (
     <>
       {showEdit && <EditUserModal user={student} onClose={() => setShowEdit(false)} />}
-      <tr className="border-b border-gray-50 hover:bg-gray-50">
+      {showDeleteModal && <SoftDeleteModal user={student} onClose={() => setShowDeleteModal(false)} />}
+      <tr className={`border-b border-gray-50 hover:bg-gray-50 ${isDeleted ? "opacity-50" : ""}`}>
         <td className="px-3 py-3">
           <div className="font-medium text-gray-900">{student.name ?? "–"}</div>
-          {student.isBlocked && (
-            <span className="text-xs text-red-600 font-medium">Bloklanmış</span>
-          )}
+          {student.isBlocked && <span className="text-xs text-red-600 font-medium">Bloklanmış</span>}
+          {isDeleted && <span className="text-xs text-gray-400 font-medium ml-1">Silinmiş</span>}
         </td>
         <td className="px-3 py-3">
           {showRole ? (
@@ -187,42 +233,46 @@ export function UserRow({ student, showRole }: { student: User; showRole?: boole
           {new Date(student.createdAt).toLocaleDateString("az-AZ")}
         </td>
         <td className="px-3 py-3 text-right">
-          <div className="flex items-center justify-end gap-1 flex-wrap">
-            {!isVerified ? (
-              <button onClick={() => doAction("verify")} disabled={actionLoading === "verify"}
-                className="text-xs text-green-700 hover:text-green-900 font-medium px-2 py-1 rounded hover:bg-green-50">
-                {actionLoading === "verify" ? "..." : "Təsdiqlə"}
+          {isDeleted ? (
+            <span className="text-xs text-gray-400 italic">Deaktiv</span>
+          ) : (
+            <div className="flex items-center justify-end gap-1 flex-wrap">
+              {!isVerified ? (
+                <button onClick={() => doAction("verify")} disabled={actionLoading === "verify"}
+                  className="text-xs text-green-700 hover:text-green-900 font-medium px-2 py-1 rounded hover:bg-green-50">
+                  {actionLoading === "verify" ? "..." : "Təsdiqlə"}
+                </button>
+              ) : (
+                <button onClick={() => doAction("unverify")} disabled={actionLoading === "unverify"}
+                  className="text-xs text-amber-600 hover:text-amber-800 font-medium px-2 py-1 rounded hover:bg-amber-50">
+                  {actionLoading === "unverify" ? "..." : "Ləğv et"}
+                </button>
+              )}
+              {!student.isBlocked ? (
+                <button onClick={() => doAction("block")} disabled={actionLoading === "block"}
+                  className="text-xs text-orange-600 hover:text-orange-800 font-medium px-2 py-1 rounded hover:bg-orange-50">
+                  {actionLoading === "block" ? "..." : "Blokla"}
+                </button>
+              ) : (
+                <button onClick={() => doAction("unblock")} disabled={actionLoading === "unblock"}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
+                  {actionLoading === "unblock" ? "..." : "Bloku aç"}
+                </button>
+              )}
+              <button onClick={() => setShowEdit(true)}
+                className="text-xs text-gray-600 hover:text-gray-900 font-medium px-2 py-1 rounded hover:bg-gray-100">
+                Redaktə
               </button>
-            ) : (
-              <button onClick={() => doAction("unverify")} disabled={actionLoading === "unverify"}
-                className="text-xs text-amber-600 hover:text-amber-800 font-medium px-2 py-1 rounded hover:bg-amber-50">
-                {actionLoading === "unverify" ? "..." : "Ləğv et"}
+              <button onClick={handleImpersonate} disabled={actionLoading === "impersonate"}
+                className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 rounded hover:bg-purple-50">
+                {actionLoading === "impersonate" ? "..." : "Giriş"}
               </button>
-            )}
-            {!student.isBlocked ? (
-              <button onClick={() => doAction("block")} disabled={actionLoading === "block"}
-                className="text-xs text-orange-600 hover:text-orange-800 font-medium px-2 py-1 rounded hover:bg-orange-50">
-                {actionLoading === "block" ? "..." : "Blokla"}
+              <button onClick={() => setShowDeleteModal(true)}
+                className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50">
+                Sil
               </button>
-            ) : (
-              <button onClick={() => doAction("unblock")} disabled={actionLoading === "unblock"}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
-                {actionLoading === "unblock" ? "..." : "Bloku aç"}
-              </button>
-            )}
-            <button onClick={() => setShowEdit(true)}
-              className="text-xs text-gray-600 hover:text-gray-900 font-medium px-2 py-1 rounded hover:bg-gray-100">
-              Redaktə
-            </button>
-            <button onClick={handleImpersonate} disabled={actionLoading === "impersonate"}
-              className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 rounded hover:bg-purple-50">
-              {actionLoading === "impersonate" ? "..." : "Giriş"}
-            </button>
-            <button onClick={handleDelete} disabled={deleting}
-              className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50">
-              {deleting ? "..." : "Sil"}
-            </button>
-          </div>
+            </div>
+          )}
         </td>
       </tr>
     </>

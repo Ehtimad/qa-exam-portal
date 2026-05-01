@@ -49,6 +49,10 @@ export default async function AdminPage() {
             <Link href="/admin/exams" className="text-sm text-gray-600 hover:text-gray-900">İmtahanlar</Link>
             <Link href="/admin/analytics" className="text-sm text-gray-600 hover:text-gray-900">Analitika</Link>
             <Link href="/admin/groups" className="text-sm text-gray-600 hover:text-gray-900">Qruplar</Link>
+            <Link href="/admin/materials" className="text-sm text-gray-600 hover:text-gray-900">Materiallar</Link>
+            <Link href="/admin/notifications" className="text-sm text-gray-600 hover:text-gray-900">Bildirişlər</Link>
+            <Link href="/admin/advertisements" className="text-sm text-gray-600 hover:text-gray-900">Elanlar</Link>
+            <Link href="/messages" className="text-sm text-gray-600 hover:text-gray-900">Mesajlar</Link>
           </div>
           <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
             <button type="submit" className="btn-secondary text-sm py-1.5 px-3">Çıxış</button>

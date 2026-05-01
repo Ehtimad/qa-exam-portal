@@ -6,10 +6,11 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 const schema = z.object({
-  name: z.string().min(2).max(100),
-  email: z.string().email(),
-  password: z.string().min(6).max(100),
-  groupId: z.string().min(1),
+  name:      z.string().min(2).max(100),
+  email:     z.string().email(),
+  password:  z.string().min(6).max(100),
+  groupId:   z.string().min(1),
+  isStudent: z.boolean().optional().default(true),
 });
 
 export async function POST(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
   }
 
-  const { name, email, password, groupId } = parsed.data;
+  const { name, email, password, groupId, isStudent } = parsed.data;
 
   const [existing] = await db
     .select({ id: users.id })
@@ -44,6 +45,9 @@ export async function POST(req: NextRequest) {
 
   const hashed = await bcrypt.hash(password, 12);
 
+  // Students require email verification (pending approval); non-students are auto-verified
+  const emailVerified = isStudent ? null : new Date();
+
   await db.insert(users).values({
     name,
     email,
@@ -51,8 +55,9 @@ export async function POST(req: NextRequest) {
     role: "student",
     groupId: group.id,
     groupName: group.name,
-    emailVerified: null,
+    isStudent,
+    emailVerified,
   });
 
-  return NextResponse.json({ success: true }, { status: 201 });
+  return NextResponse.json({ success: true, requiresApproval: isStudent }, { status: 201 });
 }

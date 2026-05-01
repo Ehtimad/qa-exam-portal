@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManageUsers } from "@/lib/rbac";
 
-const VALID_ROLES = ["student", "admin", "manager", "reporter", "worker"] as const;
+const VALID_ROLES = ["student", "admin", "manager", "reporter", "worker", "teacher"] as const;
 
 const updateSchema = z.object({
   name:        z.string().min(2).max(100),
@@ -68,11 +68,25 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json({ success: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  await db.delete(users).where(eq(users.id, id));
+  let reason: string | null = null;
+  try {
+    const body = await req.json();
+    reason = body.reason ?? null;
+  } catch { /* no body */ }
+
+  if (!reason?.trim()) {
+    return NextResponse.json({ error: "Silmə səbəbi tələb olunur" }, { status: 400 });
+  }
+
+  await db
+    .update(users)
+    .set({ deletedAt: new Date(), deletionReason: reason.trim() })
+    .where(eq(users.id, id));
+
   revalidatePath("/admin/users");
   return NextResponse.json({ success: true });
 }

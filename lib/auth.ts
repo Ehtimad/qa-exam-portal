@@ -79,11 +79,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(parsed.data.password, user.password);
         if (!valid) return null;
 
+        // Soft-delete check
+        if (user.deletedAt) return null;
+
         // Block check
         if (user.isBlocked) return null;
 
         // Staff roles bypass email verification; students must be verified
-        const staffRoles = ["admin", "manager", "reporter", "worker"];
+        const staffRoles = ["admin", "manager", "reporter", "worker", "teacher"];
         if (!staffRoles.includes(user.role) && !user.emailVerified) return null;
 
         return {

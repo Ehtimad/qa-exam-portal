@@ -10,6 +10,7 @@ interface Group { id: string; name: string; }
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "", groupId: "" });
+  const [isStudent, setIsStudent] = useState(true);
   const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,12 +30,18 @@ export default function RegisterPage() {
     const res = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, password: form.password, groupId: form.groupId }),
+      body: JSON.stringify({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        groupId: form.groupId,
+        isStudent,
+      }),
     });
     const data = await res.json();
     setLoading(false);
     if (!res.ok) { setError(data.error ?? "Qeydiyyat xətası"); }
-    else { router.push("/auth/signin?registered=1"); }
+    else { router.push(isStudent ? "/auth/signin?registered=1" : "/auth/signin?registered=2"); }
   }
 
   return (
@@ -52,6 +59,29 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* isStudent toggle */}
+            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-800">Tələbəsən?</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {isStudent ? "Bəli — admin təsdiqi gözlənilir" : "Xeyr — dərhal daxil ola bilərsən"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStudent((v) => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  isStudent ? "bg-blue-600" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isStudent ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ad Soyad</label>
               <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -87,9 +117,11 @@ export default function RegisterPage() {
         </div>
 
         <div className="text-center mt-4 space-y-2">
-          <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-            Qeydiyyatdan sonra admin tərəfindən təsdiq gözlənilir
-          </p>
+          {isStudent && (
+            <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+              Qeydiyyatdan sonra admin tərəfindən təsdiq gözlənilir
+            </p>
+          )}
           <p className="text-gray-500 text-sm">
             Artıq hesabın var?{" "}
             <Link href="/auth/signin" className="text-blue-600 hover:underline font-medium">Daxil ol</Link>

@@ -5,10 +5,12 @@ import { eq, desc, and, or, isNull, inArray, sum } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
+import Heartbeat from "@/components/Heartbeat";
+import AdsBanner from "@/components/AdsBanner";
+import NotificationBell from "@/components/NotificationBell";
 
 async function getDynamicMaxScore(groupId: string | null | undefined): Promise<number> {
   try {
-    // 1. Check for active exam assigned to user's group (or global)
     const activeExams = await db
       .select({ id: exams.id, groupId: exams.groupId })
       .from(exams)
@@ -29,14 +31,12 @@ async function getDynamicMaxScore(groupId: string | null | undefined): Promise<n
         .from(examQuestions).where(eq(examQuestions.examId, exam.id));
       questionIds = rows.map((r) => r.questionId);
     } else if (groupId) {
-      // 2. Fall back to question_groups M2M
       const rows = await db.select({ questionId: questionGroups.questionId })
         .from(questionGroups).where(eq(questionGroups.groupId, groupId));
       questionIds = rows.map((r) => r.questionId);
     }
 
     if (questionIds.length === 0) {
-      // 3. All questions fallback
       const [res] = await db.select({ total: sum(questions.points) }).from(questions);
       return Number(res?.total ?? 500);
     }
@@ -77,10 +77,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Heartbeat />
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <Link href="/dashboard" className="font-semibold text-gray-900">QA Exam Portal</Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/materials" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Materiallar</Link>
+            <Link href="/messages" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Mesajlar</Link>
+            <NotificationBell userId={session.user.id} />
             <span className="text-sm text-gray-500">{session.user.name}</span>
             {session.user.impersonatedBy && (
               <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-lg font-medium">
@@ -101,6 +105,8 @@ export default async function DashboardPage() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
+        <AdsBanner />
+
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Şəxsi Kabinet</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

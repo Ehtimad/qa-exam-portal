@@ -1,4 +1,4 @@
-# QA Online Exam Portal — Quraşdırma Təlimatı
+# QA Online Exam Portal — Quraşdırma Təlimatı (v5)
 
 ## Texniki Stack
 
@@ -6,9 +6,10 @@
 |-----------|-------------|
 | Framework | Next.js 15 (App Router) |
 | CSS | Tailwind CSS |
-| Database | SQLite via Turso/libSQL |
+| Database | Neon PostgreSQL (Serverless) |
 | ORM | Drizzle ORM |
 | Auth | NextAuth.js v5 |
+| Real-time | Pusher (Channels) |
 | Deploy | Vercel |
 
 ---
@@ -23,102 +24,121 @@ cd exam-portal
 # 2. Paketləri qur
 npm install
 
-# 3. .env faylını yarat
-cp .env.example .env
-# .env faylında dəyərləri dəyişdir
+# 3. .env.local faylını yarat
+cp .env.example .env.local
+# Aşağıdakı dəyərləri doldurun:
 
-# 4. Veritabanını yarat (lokal SQLite)
-npm run db:migrate
-
-# 5. İlk Admin istifadəçisi yarat
-npm run db:seed-admin
-
-# 6. Dev serveri başlat
+# 4. Dev serveri başlat
 npm run dev
 ```
 
-→ http://localhost:3000 ünvanında açılar.
+→ http://localhost:3000 ünvanında açılar.  
+İlk açılışda `lib/init-db.ts` cədvəlləri yaradır, admin + 100 sualı seed edir.
 
 ---
 
-## 2. Vercel + Turso Deploy
+## 2. Mühit Dəyişənləri (`.env.local`)
 
-### Addım 1: Turso veritabanı yarat
+```env
+# Neon PostgreSQL (neon.tech-dən alın)
+DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
 
-```bash
-# Turso CLI qur
-brew install tursodatabase/tap/turso
+# NextAuth
+AUTH_SECRET=ən_az_32_simvol_random_string
+AUTH_URL=http://localhost:3000
+NEXTAUTH_URL=https://sizin-app.vercel.app
 
-# Giriş et
-turso auth login
+# Pusher (pusher.com → Channels → App yaradın)
+PUSHER_APP_ID=your_app_id
+PUSHER_KEY=your_pusher_key
+PUSHER_SECRET=your_pusher_secret
+PUSHER_CLUSTER=eu
+NEXT_PUBLIC_PUSHER_KEY=your_pusher_key
+NEXT_PUBLIC_PUSHER_CLUSTER=eu
 
-# Veritabanı yarat
-turso db create qa-exam-db
-
-# URL və token al
-turso db show qa-exam-db --url
-turso db tokens create qa-exam-db
+# Admin seed (DB boş olduqda istifadə edilir)
+ADMIN_EMAIL=admin@exam.local
+ADMIN_PASSWORD=Admin@123
+ADMIN_NAME=Admin
 ```
 
-### Addım 2: Vercel-ə deploy et
+---
 
+## 3. Vercel Deploy
+
+### Addım 1: Neon DB yarat
+1. [neon.tech](https://neon.tech) → Yeni project yarat
+2. Connection string-i kopyala → `DATABASE_URL`
+
+### Addım 2: Pusher App yarat
+1. [pusher.com](https://pusher.com) → Channels → "Create app"
+2. App Keys bölməsindən: **App ID**, **Key**, **Secret**, **Cluster** alın
+3. Vercel env vars-a əlavə edin
+
+### Addım 3: Vercel-ə deploy et
 ```bash
-# Vercel CLI qur
+# Vercel CLI (istəyə bağlı)
 npm i -g vercel
-
-# Deploy
 vercel
 
-# Environment dəyişənlərini əlavə et:
-# TURSO_DATABASE_URL=libsql://qa-exam-db-xxx.turso.io
-# TURSO_AUTH_TOKEN=eyJ...
-# AUTH_SECRET=<random 32 char string>
-# AUTH_URL=https://your-app.vercel.app
-# AUTH_GOOGLE_ID=<optional>
-# AUTH_GOOGLE_SECRET=<optional>
+# Yaxud: GitHub repo-nu Vercel-ə connect edin
+# push etdikdə avtomatik deploy
 ```
 
-### Addım 3: Canlı veritabanını qur
+### Addım 4: Vercel Environment Variables
+Vercel Dashboard → Project → Settings → Environment Variables:
 
-```bash
-TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... npm run db:migrate
-TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... npm run db:seed-admin
-```
+| Key | Value |
+|-----|-------|
+| `DATABASE_URL` | Neon connection string |
+| `AUTH_SECRET` | Random 32+ char string |
+| `NEXTAUTH_URL` | `https://sizin-app.vercel.app` |
+| `PUSHER_APP_ID` | Pusher app id |
+| `PUSHER_KEY` | Pusher key |
+| `PUSHER_SECRET` | Pusher secret |
+| `PUSHER_CLUSTER` | `eu` (və ya sizin cluster) |
+| `NEXT_PUBLIC_PUSHER_KEY` | Pusher key (eyni) |
+| `NEXT_PUBLIC_PUSHER_CLUSTER` | `eu` (eyni) |
 
 ---
 
-## 3. Admin Hesabı
+## 4. Admin Hesabı
 
-Default credentials (dəyişdirin!):
+Default credentials:
 - E-poçt: `admin@exam.local`
 - Şifrə: `Admin@123`
 
-Öz admin hesabını yaratmaq üçün:
-```bash
-ADMIN_EMAIL=siz@example.com ADMIN_PASSWORD=güclüşifrə npm run db:seed-admin
+**İlk girişdən sonra dərhəl şifrəni dəyişin!**
+
+---
+
+## 5. İstifadəçi Axışı
+
+### Tələbə (isStudent = true):
+```
+Qeydiyyat → "Tələbəsən?" toggle = ON
+  ↓
+Admin /admin/users → "Təsdiqlə" düyməsi
+  ↓
+Tələbə /dashboard-a giriş edə bilir
+  ↓
+/exam → İmtahan verir
+  ↓
+/dashboard/materials → Materialları görür
+  ↓
+/messages → Mesajlaşır
+```
+
+### Qeyri-tələbə (isStudent = false):
+```
+Qeydiyyat → "Tələbəsən?" toggle = OFF
+  ↓
+Dərhal giriş (admin təsdiqi yoxdur)
 ```
 
 ---
 
-## 4. İstifadəçi Axışı
-
-```
-Tələbə qeydiyyatdan keçir
-  ↓
-Admin /admin/users-da "Təsdiq et" düyməsinə basır
-  ↓
-Tələbə /exam-ə gedir → 100 sual
-  ↓
-Bütün sualları cavablandırır (Required!)
-  ↓
-"Bitir" düyməsinə basır → Bal hesablanır
-  ↓
-/dashboard-da keçmiş nəticələrə baxa bilir
-```
-
----
-
-## 5. İmtahan Quruluşu
+## 6. İmtahan Quruluşu
 
 | Mühazirə | Mövzu | Sual sayı |
 |----------|-------|-----------|
@@ -131,6 +151,30 @@ Bütün sualları cavablandırır (Required!)
 | M7 | Yekun Mövzular | 14 |
 | **Cəmi** | | **100 sual / 500 bal** |
 
-Çətinlik: Asan (3 bal) • Orta (5 bal) • Çətin (8 bal)
+Keçid balı: **70%** (350 bal)
 
-Keçid balı: 70% (350 bal)
+---
+
+## 7. Rol Sistemi
+
+| Rol | Kim üçün | Giriş |
+|-----|----------|-------|
+| `student` | İmtahan verənlər | Dashboard, Exam, Materials, Messages |
+| `admin` | Sistem admini | Hər yer |
+| `manager` | Kurs meneceri | Admin (geniş) |
+| `reporter` | Analitik | Nəticələr, Analytics |
+| `worker` | Sual hazırlayan | Suallar, Import |
+| `teacher` | Müəllim | Materiallar, Bildirişlər |
+
+---
+
+## 8. Yeni v5 Xüsusiyyətlər
+
+- **Real-time mesajlaşma** — Pusher ilə anlıq chat
+- **Bildiriş sistemi** — fərdi/qrup/hamıya, real-time
+- **Material planlaması** — start/end tarix, qrupa görə
+- **Elan banneri** — rol-filtrli, bağlanabilir
+- **Soft delete** — istifadəçilər silinmir, deaktiv olunur (səbəb məcburi)
+- **Teacher rolu** — materiallar + bildirişlər + tələbə siyahısı
+- **isStudent toggle** — qeydiyyatda tələbə/qeyri-tələbə seçimi
+- **Heartbeat** — hər 30s `last_seen_at` yenilənir (online statusu üçün)
