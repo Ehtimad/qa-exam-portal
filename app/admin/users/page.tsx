@@ -1,13 +1,14 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, groups } from "@/lib/schema";
-import { asc } from "drizzle-orm";
+import { asc, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { UserRow } from "./UserActions";
+import { UserRow, CreateUserModal } from "./UserActions";
 import { Suspense } from "react";
 import UsersFilterBar from "./UsersFilterBar";
-import { canManageUsers, ROLE_LABELS, ROLE_COLORS } from "@/lib/rbac";
+import { canManageUsers } from "@/lib/rbac";
+import CreateUserButton from "./CreateUserButton";
 
 type DBUser = typeof users.$inferSelect;
 type Group = typeof groups.$inferSelect;
@@ -27,7 +28,7 @@ export default async function AdminUsersPage({
   let dbError = false;
 
   try {
-    allUsers = await db.select().from(users).orderBy(asc(users.createdAt));
+    allUsers = await db.select().from(users).where(isNull(users.deletedAt)).orderBy(asc(users.createdAt));
     allGroups = await db.select().from(groups).orderBy(asc(groups.name));
   } catch {
     dbError = true;
@@ -59,15 +60,17 @@ export default async function AdminUsersPage({
         <div className="max-w-6xl mx-auto flex items-center gap-6 flex-wrap">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">← Admin</Link>
           <span className="font-semibold text-gray-900">İstifadəçilər</span>
-          <Link href="/admin/results"   className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
-          <Link href="/admin/questions" className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
-          <Link href="/admin/exams"     className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
-          <Link href="/admin/analytics" className="text-sm text-gray-500 hover:text-gray-900">Analitika</Link>
-          <Link href="/admin/groups"    className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
-          <Link href="/admin/materials" className="text-sm text-gray-500 hover:text-gray-900">Materiallar</Link>
+          <Link href="/admin/results"       className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
+          <Link href="/admin/questions"     className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
+          <Link href="/admin/exams"         className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
+          <Link href="/admin/analytics"     className="text-sm text-gray-500 hover:text-gray-900">Analitika</Link>
+          <Link href="/admin/online"        className="text-sm text-gray-500 hover:text-gray-900">Online</Link>
+          <Link href="/admin/groups"        className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
+          <Link href="/admin/materials"     className="text-sm text-gray-500 hover:text-gray-900">Materiallar</Link>
           <Link href="/admin/notifications" className="text-sm text-gray-500 hover:text-gray-900">Bildirişlər</Link>
           <Link href="/admin/advertisements" className="text-sm text-gray-500 hover:text-gray-900">Elanlar</Link>
-          <Link href="/messages" className="text-sm text-gray-500 hover:text-gray-900">Mesajlar</Link>
+          <Link href="/admin/activity"      className="text-sm text-gray-500 hover:text-gray-900">Fəaliyyət</Link>
+          <Link href="/messages"            className="text-sm text-gray-500 hover:text-gray-900">Mesajlar</Link>
         </div>
       </nav>
 
@@ -85,6 +88,7 @@ export default async function AdminUsersPage({
                 <h2 className="text-lg font-bold text-gray-900">Sistem İşçiləri
                   <span className="ml-2 text-sm font-normal text-gray-400">({filteredStaff.length})</span>
                 </h2>
+                <CreateUserButton />
               </div>
               <div className="card overflow-hidden">
                 {filteredStaff.length === 0 ? (

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users, impersonationTokens } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { canManageUsers } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
 
 async function requireAdmin() {
   const session = await auth();
@@ -29,6 +30,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     adminId: session.user.id,
     targetUserId: id,
     expiresAt,
+  });
+
+  await logActivity({
+    actorId:    session.user.id,
+    actorEmail: session.user.email,
+    action:     "impersonation.start",
+    targetType: "user",
+    targetId:   id,
+    details:    { targetRole: target.role },
   });
 
   return NextResponse.json({ token });

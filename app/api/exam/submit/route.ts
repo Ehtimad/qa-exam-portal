@@ -5,6 +5,7 @@ import { examAttempts, examSessions, questions } from "@/lib/schema";
 import { calculateExamScore } from "@/lib/scoring";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity";
 
 const schema = z.object({
   answers: z.record(z.string(), z.array(z.number())).optional(),
@@ -98,6 +99,15 @@ export async function POST(req: NextRequest) {
   if (sessionId) {
     await db.update(examSessions).set({ status: "submitted" }).where(eq(examSessions.id, sessionId));
   }
+
+  await logActivity({
+    actorId:    userId,
+    actorEmail: session.user.email,
+    action:     "exam.submit",
+    targetType: "exam",
+    targetId:   examId ?? undefined,
+    details:    { score, maxScore: dynamicMax, correct: correctCount, pct: Math.round(score / dynamicMax * 100) },
+  });
 
   return NextResponse.json({ score, maxScore: dynamicMax, correct: correctCount, attemptId: inserted.id }, { status: 201 });
 }

@@ -92,7 +92,7 @@ export default function MessagesClient({ userId, userName }: { userId: string; u
   );
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-gray-50">
+    <div className="flex h-full bg-gray-50">
       {/* Contacts list */}
       <div className="w-72 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-100">

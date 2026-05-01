@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManageUsers } from "@/lib/rbac";
+import { logActivity } from "@/lib/activity";
 
 const VALID_ROLES = ["student", "admin", "manager", "reporter", "worker", "teacher"] as const;
 
@@ -25,7 +26,8 @@ async function requireAdmin() {
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const session = await requireAdmin();
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   const body = await req.json();
@@ -44,32 +46,25 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     groupName = group.name;
   }
 
-  const updates: Record<string, unknown> = {
-    name,
-    email,
-    groupId: groupId ?? null,
-    groupName,
-  };
+  const updates: Record<string, unknown> = { name, email, groupId: groupId ?? null, groupName };
   if (role) updates.role = role;
-  if (newPassword) {
-    updates.password = await bcrypt.hash(newPassword, 12);
-  }
+  if (newPassword) updates.password = await bcrypt.hash(newPassword, 12);
 
   await db.update(users).set(updates).where(eq(users.id, id));
 
-  // If group changed, clear any in-progress exam session so user gets fresh questions
   if (existing.groupId !== (groupId ?? null)) {
-    await db.delete(examSessions).where(
-      and(eq(examSessions.userId, id), eq(examSessions.status, "in_progress"))
-    );
+    await db.delete(examSessions).where(and(eq(examSessions.userId, id), eq(examSessions.status, "in_progress")));
   }
+
+  await logActivity({ actorId: session.user.id, actorEmail: session.user.email, action: "user.update", targetType: "user", targetId: id, details: { name, email, role } });
 
   revalidatePath("/admin/users");
   return NextResponse.json({ success: true });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const session = await requireAdmin();
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   let reason: string | null = null;
@@ -82,10 +77,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: "Silmə səbəbi tələb olunur" }, { status: 400 });
   }
 
-  await db
-    .update(users)
-    .set({ deletedAt: new Date(), deletionReason: reason.trim() })
-    .where(eq(users.id, id));
+  const [target] = await db.select({ email: users.email }).from(users).where(eq(users.id, id)).limit(1);
+
+  await db.update(users).set({ deletedAt: new Date(), deletionReason: reason.trim() }).where(eq(users.id, id));
+
+  await logActivity({ actorId: session.user.id, actorEmail: session.user.email, action: "user.delete", targetType: "user", targetId: id, details: { reason, targetEmail: target?.email } });
 
   revalidatePath("/admin/users");
   return NextResponse.json({ success: true });

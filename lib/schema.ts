@@ -190,6 +190,21 @@ export const advertisements = pgTable("advertisements", {
   createdAt:  timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── ACTIVITY LOGS ───────────────────────────────────────────────────────
+export const activityLogs = pgTable("activity_logs", {
+  id:         text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  actorId:    text("actor_id").references(() => users.id, { onDelete: "set null" }),
+  actorEmail: text("actor_email"),
+  action:     text("action").notNull(),
+  // e.g. "user.create" | "user.delete" | "user.block" | "exam.start"
+  // "exam.submit" | "material.upload" | "material.delete"
+  // "notification.send" | "impersonation.start"
+  targetType: text("target_type"),   // "user" | "exam" | "material" | etc.
+  targetId:   text("target_id"),
+  details:    text("details"),       // JSON extra info
+  createdAt:  timestamp("created_at").notNull().defaultNow(),
+});
+
 // ─── TYPES ───────────────────────────────────────────────────────────────
 export type QuestionGroup  = typeof questionGroups.$inferSelect;
 export type User           = typeof users.$inferSelect;
@@ -204,3 +219,4 @@ export type Material       = typeof materials.$inferSelect;
 export type Message        = typeof messages.$inferSelect;
 export type Notification   = typeof notifications.$inferSelect;
 export type Advertisement  = typeof advertisements.$inferSelect;
+export type ActivityLog    = typeof activityLogs.$inferSelect;

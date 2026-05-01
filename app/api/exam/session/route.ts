@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { examSessions, examAttempts, exams, examQuestions, questions, users } from "@/lib/schema";
 import { eq, and, or, isNull } from "drizzle-orm";
+import { logActivity } from "@/lib/activity";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -123,6 +124,15 @@ export async function POST(_req: NextRequest) {
     tabSwitches: 0,
     status: "in_progress",
   }).returning();
+
+  await logActivity({
+    actorId:    userId,
+    actorEmail: session.user.email,
+    action:     "exam.start",
+    targetType: "exam",
+    targetId:   examId ?? undefined,
+    details:    { questionCount: questionOrder.length },
+  });
 
   return NextResponse.json({
     session: {

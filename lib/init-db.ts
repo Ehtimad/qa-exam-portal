@@ -213,6 +213,18 @@ export async function initDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS activity_logs (
+      id TEXT PRIMARY KEY,
+      actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      actor_email TEXT,
+      action TEXT NOT NULL,
+      target_type TEXT,
+      target_id TEXT,
+      details TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
   // ── Seed admin ───────────────────────────────────────────────────────
   const [adminRow] = await sql`SELECT count(*)::int AS c FROM users WHERE role='admin'`;
   if ((adminRow.c as number) === 0) {

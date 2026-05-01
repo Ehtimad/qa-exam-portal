@@ -5,11 +5,12 @@ import { eq, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
-import { isStaff } from "@/lib/rbac";
+import { isStaff, canManageUsers, canViewResults, canViewAnalytics, canManageQuestions, canManageExams, canManageGroups, canManageMaterials, canSendNotifications, canManageAds } from "@/lib/rbac";
 
 export default async function AdminPage() {
   const session = await auth();
   if (!session || !isStaff(session.user.role)) redirect("/dashboard");
+  const role = session.user.role;
 
   const [totalStudents] = await db
     .select({ count: count() })
@@ -41,17 +42,21 @@ export default async function AdminPage() {
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4 flex-wrap">
-            <span className="font-semibold text-gray-900">Admin Panel</span>
+            <span className="font-semibold text-gray-900">
+              {role === "teacher" ? "Müəllim Paneli" : "Admin Panel"}
+            </span>
             <Link href="/admin" className="text-sm text-blue-600 font-medium">Dashboard</Link>
-            <Link href="/admin/users" className="text-sm text-gray-600 hover:text-gray-900">İstifadəçilər</Link>
-            <Link href="/admin/results" className="text-sm text-gray-600 hover:text-gray-900">Nəticələr</Link>
-            <Link href="/admin/questions" className="text-sm text-gray-600 hover:text-gray-900">Suallar</Link>
-            <Link href="/admin/exams" className="text-sm text-gray-600 hover:text-gray-900">İmtahanlar</Link>
-            <Link href="/admin/analytics" className="text-sm text-gray-600 hover:text-gray-900">Analitika</Link>
-            <Link href="/admin/groups" className="text-sm text-gray-600 hover:text-gray-900">Qruplar</Link>
-            <Link href="/admin/materials" className="text-sm text-gray-600 hover:text-gray-900">Materiallar</Link>
-            <Link href="/admin/notifications" className="text-sm text-gray-600 hover:text-gray-900">Bildirişlər</Link>
-            <Link href="/admin/advertisements" className="text-sm text-gray-600 hover:text-gray-900">Elanlar</Link>
+            {canManageUsers(role)    && <Link href="/admin/users"     className="text-sm text-gray-600 hover:text-gray-900">İstifadəçilər</Link>}
+            {canViewResults(role)    && <Link href="/admin/results"   className="text-sm text-gray-600 hover:text-gray-900">Nəticələr</Link>}
+            {canManageQuestions(role) && <Link href="/admin/questions" className="text-sm text-gray-600 hover:text-gray-900">Suallar</Link>}
+            {canManageExams(role)    && <Link href="/admin/exams"     className="text-sm text-gray-600 hover:text-gray-900">İmtahanlar</Link>}
+            {canViewAnalytics(role)  && <Link href="/admin/analytics" className="text-sm text-gray-600 hover:text-gray-900">Analitika</Link>}
+            {canManageGroups(role)   && <Link href="/admin/groups"    className="text-sm text-gray-600 hover:text-gray-900">Qruplar</Link>}
+            {canManageMaterials(role) && <Link href="/admin/materials" className="text-sm text-gray-600 hover:text-gray-900">Materiallar</Link>}
+            {canSendNotifications(role) && <Link href="/admin/notifications" className="text-sm text-gray-600 hover:text-gray-900">Bildirişlər</Link>}
+            {canManageAds(role)      && <Link href="/admin/advertisements" className="text-sm text-gray-600 hover:text-gray-900">Elanlar</Link>}
+            {canManageUsers(role)    && <Link href="/admin/online"    className="text-sm text-gray-600 hover:text-gray-900">Online</Link>}
+            {canManageUsers(role)    && <Link href="/admin/activity"  className="text-sm text-gray-600 hover:text-gray-900">Fəaliyyət</Link>}
             <Link href="/messages" className="text-sm text-gray-600 hover:text-gray-900">Mesajlar</Link>
           </div>
           <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>

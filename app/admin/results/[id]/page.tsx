@@ -64,7 +64,7 @@ export default async function AdminResultDetailPage({ params }: { params: Promis
                 {new Date(attempt.completedAt).toLocaleString("az-AZ")} • {dur}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col items-end gap-3">
               <div className="text-center">
                 <div className={`text-3xl font-bold ${passed ? "text-green-600" : "text-red-600"}`}>
                   {attempt.score}/{attempt.maxScore}
@@ -74,7 +74,19 @@ export default async function AdminResultDetailPage({ params }: { params: Promis
                 </div>
                 <div className="text-xs text-gray-500">{attempt.correctAnswers}/100 düzgün</div>
               </div>
-              <ResetAttemptButton attemptId={attempt.id} />
+              <div className="flex flex-wrap gap-2">
+                <a href={`/api/user/result/${attempt.id}`} download
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                  PDF Yüklə
+                </a>
+                {passed && (
+                  <a href={`/api/user/certificate/${attempt.id}`} download
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-green-400 bg-green-50 text-green-700 hover:bg-green-100">
+                    Sertifikat
+                  </a>
+                )}
+                <ResetAttemptButton attemptId={attempt.id} />
+              </div>
             </div>
           </div>
         </div>

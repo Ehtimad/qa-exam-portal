@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { users, examAttempts, questions } from "@/lib/schema";
-import { desc, gte } from "drizzle-orm";
+import { users, examAttempts, questions, activityLogs } from "@/lib/schema";
+import { desc, gte, count, eq, isNull, ne } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canViewAnalytics } from "@/lib/rbac";
@@ -27,6 +27,31 @@ export default async function AdminAnalyticsPage() {
       .where(gte(users.lastSeenAt, fiveMinAgo))
       .orderBy(desc(users.lastSeenAt));
   } catch { /* column may not exist yet */ }
+
+  // --- User Breakdown ---
+  let totalStudents = 0, totalStaff = 0, totalTeachers = 0;
+  let studentsVerified = 0, studentsBlocked = 0;
+  try {
+    const allUsers = await db.select({ role: users.role, emailVerified: users.emailVerified, isBlocked: users.isBlocked })
+      .from(users).where(isNull(users.deletedAt));
+    totalStudents = allUsers.filter((u) => u.role === "student").length;
+    totalStaff    = allUsers.filter((u) => u.role !== "student" && u.role !== "teacher").length;
+    totalTeachers = allUsers.filter((u) => u.role === "teacher").length;
+    studentsVerified = allUsers.filter((u) => u.role === "student" && u.emailVerified).length;
+    studentsBlocked  = allUsers.filter((u) => u.role === "student" && u.isBlocked).length;
+  } catch { /* ignore */ }
+
+  // --- Teacher activity (last 30 days) ---
+  let teacherActivity: Array<{ actorEmail: string | null; actions: number }> = [];
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const rows = await db.select({ actorEmail: activityLogs.actorEmail, count: count() })
+      .from(activityLogs)
+      .where(gte(activityLogs.createdAt, thirtyDaysAgo))
+      .groupBy(activityLogs.actorEmail)
+      .orderBy(desc(count()));
+    teacherActivity = rows.map((r) => ({ actorEmail: r.actorEmail, actions: Number(r.count) })).slice(0, 10);
+  } catch { /* ignore */ }
 
   // --- Attempt + Question analysis ---
   type QStat = { id: number; text: string; lectureId: number; attempts: number; errors: number; errorRate: number; points: number };
@@ -120,15 +145,17 @@ export default async function AdminAnalyticsPage() {
         <div className="max-w-6xl mx-auto flex items-center gap-6 flex-wrap">
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">← Admin</Link>
           <span className="font-semibold text-gray-900">Analitika</span>
-          <Link href="/admin/users" className="text-sm text-gray-500 hover:text-gray-900">İstifadəçilər</Link>
-          <Link href="/admin/results" className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
+          <Link href="/admin/users"     className="text-sm text-gray-500 hover:text-gray-900">İstifadəçilər</Link>
+          <Link href="/admin/online"    className="text-sm text-gray-500 hover:text-gray-900">Online</Link>
+          <Link href="/admin/results"   className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
           <Link href="/admin/questions" className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
-          <Link href="/admin/exams" className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
-          <Link href="/admin/groups" className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
+          <Link href="/admin/exams"     className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
+          <Link href="/admin/groups"    className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
           <Link href="/admin/materials" className="text-sm text-gray-500 hover:text-gray-900">Materiallar</Link>
           <Link href="/admin/notifications" className="text-sm text-gray-500 hover:text-gray-900">Bildirişlər</Link>
           <Link href="/admin/advertisements" className="text-sm text-gray-500 hover:text-gray-900">Elanlar</Link>
-          <Link href="/messages" className="text-sm text-gray-500 hover:text-gray-900">Mesajlar</Link>
+          <Link href="/admin/activity"  className="text-sm text-gray-500 hover:text-gray-900">Fəaliyyət</Link>
+          <Link href="/messages"        className="text-sm text-gray-500 hover:text-gray-900">Mesajlar</Link>
         </div>
       </nav>
 
@@ -178,6 +205,69 @@ export default async function AdminAnalyticsPage() {
             )}
           </div>
         </section>
+
+        {/* User Breakdown */}
+        <section>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">İstifadəçi Statistikası</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div className="card text-center py-4">
+              <div className="text-3xl font-bold text-blue-600">{totalStudents}</div>
+              <div className="text-sm text-gray-500 mt-1">Tələbə</div>
+            </div>
+            <div className="card text-center py-4">
+              <div className="text-3xl font-bold text-green-600">{studentsVerified}</div>
+              <div className="text-sm text-gray-500 mt-1">Təsdiqlənmiş</div>
+            </div>
+            <div className="card text-center py-4">
+              <div className="text-3xl font-bold text-amber-600">{totalStudents - studentsVerified}</div>
+              <div className="text-sm text-gray-500 mt-1">Gözləyir</div>
+            </div>
+            <div className="card text-center py-4">
+              <div className="text-3xl font-bold text-purple-600">{totalTeachers}</div>
+              <div className="text-sm text-gray-500 mt-1">Müəllim</div>
+            </div>
+            <div className="card text-center py-4">
+              <div className="text-3xl font-bold text-gray-600">{totalStaff}</div>
+              <div className="text-sm text-gray-500 mt-1">Digər işçi</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Top Active Users (last 30 days) */}
+        {teacherActivity.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              Aktiv İstifadəçilər
+              <span className="ml-2 text-sm font-normal text-gray-400">(son 30 gün, fəaliyyət jurnalına görə)</span>
+            </h2>
+            <div className="card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">E-poçt</th>
+                      <th className="text-right px-4 py-3 text-gray-500 font-medium">Əməliyyat sayı</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teacherActivity.map((row, i) => (
+                      <tr key={row.actorEmail ?? i} className="border-b border-gray-50">
+                        <td className="px-4 py-3 text-gray-400">{i + 1}</td>
+                        <td className="px-4 py-3 text-gray-700">{row.actorEmail ?? "–"}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                            {row.actions}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
 
         {analysisError ? (
           <div className="card">

@@ -149,7 +149,7 @@ Keçid balı: **70%** (350 bal)
 
 ---
 
-## 8. v5 Xüsusiyyətlər
+## 8. v6 Xüsusiyyətlər
 
 | Xüsusiyyət | Açıqlama |
 |---|---|
@@ -158,9 +158,15 @@ Keçid balı: **70%** (350 bal)
 | Material planlaması | start/end tarix, qrupa görə |
 | Elan banneri | rol-filtrli, bağlanabilir |
 | Soft delete | `deleted_at` + `deletion_reason`, səbəb məcburi |
-| Teacher rolu | materiallar + bildirişlər + tələbə siyahısı |
+| Teacher rolu | tam panel: materiallar + bildirişlər + tələbə siyahısı |
 | isStudent toggle | qeydiyyatda tələbə/qeyri-tələbə seçimi |
 | Heartbeat | hər 30s `last_seen_at` yenilənir |
+| Fəaliyyət jurnalı | `activity_logs` cədvəli, `/admin/activity` səhifəsi |
+| Admin istifadəçi yaratma | bütün 6 rol dəstəyi, avtomatik email-verify |
+| Online Users səhifəsi | `/admin/online` — müstəqil real-time siyahı |
+| Sertifikat (admin görünüşü) | admin nəticə səhifəsindən birbaşa yüklə |
+| Analitika yeniləndi | tələbə vs qeyri-tələbə, aktiv istifadəçi sıralaması |
+| Back/nav düymələri | bütün alt-səhifələrdə naviqasiya barları |
 
 ---
 
@@ -177,4 +183,4 @@ Yeni sütunlar (əlavə edilib, data pozulmayıb):
 - `exams.target_type`
 
 Yeni cədvəllər (yaradılıb):
-- `materials`, `messages`, `notifications`, `advertisements`
+- `materials`, `messages`, `notifications`, `advertisements`, `activity_logs`

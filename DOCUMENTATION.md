@@ -1,8 +1,8 @@
-# QA Exam Portal — Tam Sənədləşmə (v5 — LMS Upgrade)
+# QA Exam Portal — Tam Sənədləşmə (v6 — Activity Logs, Create User, Online Page)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
 > **Repo:** GitHub — Ehtimad/qa-exam-portal  
-> **Son versiya:** v5 — Real-time mesajlaşma, materiallar, bildirişlər, elanlar, soft delete, teacher rolu
+> **Son versiya:** v6 — Fəaliyyət jurnalı, yeni istifadəçi yaratma (bütün rollar), Online Users səhifəsi, Analitika yeniləndi, Müəllim paneli, nav düymələri
 
 ---
 
@@ -237,6 +237,18 @@ expires_at TIMESTAMPTZ
 created_at TIMESTAMPTZ
 ```
 
+### `activity_logs`
+```sql
+id TEXT PRIMARY KEY
+actor_id TEXT → users(id) ON DELETE SET NULL   -- kim etdi
+actor_email TEXT                                -- logging üçün e-poçt
+action TEXT NOT NULL                            -- user.create | user.delete | user.block | user.unblock | user.verify | exam.start | exam.submit | material.upload | notification.send | impersonation.start
+target_type TEXT                                -- 'user' | 'exam' | 'material' | ...
+target_id TEXT                                  -- hədəf resursun ID-si
+details TEXT                                    -- JSON formatında əlavə məlumat
+created_at TIMESTAMPTZ
+```
+
 ---
 
 ## 4. Fayl Strukturu
@@ -274,23 +286,27 @@ exam-portal/
 │   │   └── [id]/page.tsx
 │   │
 │   ├── admin/
-│   │   ├── page.tsx
+│   │   ├── page.tsx                      # Rol-filtrli nav (teacher vs admin)
 │   │   ├── users/
-│   │   │   ├── page.tsx
-│   │   │   ├── UserActions.tsx           # SoftDeleteModal (səbəb məcburi)
+│   │   │   ├── page.tsx                  # Soft-delete filter, Create button
+│   │   │   ├── UserActions.tsx           # CreateUserModal, SoftDeleteModal
+│   │   │   ├── CreateUserButton.tsx      # Client wrapper for create modal
 │   │   │   └── UsersFilterBar.tsx
 │   │   ├── results/
+│   │   │   └── [id]/page.tsx             # PDF + Sertifikat yükləmə (admin)
 │   │   ├── questions/
 │   │   ├── exams/
 │   │   ├── groups/
-│   │   ├── analytics/
-│   │   ├── materials/                    # Material CRUD
+│   │   ├── analytics/                    # + User stats + Aktiv istifadəçi sırası
+│   │   ├── online/page.tsx               # Standalone Online Users
+│   │   ├── activity/page.tsx             # Fəaliyyət jurnalı (filter + page)
+│   │   ├── materials/                    # Material CRUD (nav bar əlavə edildi)
 │   │   │   ├── page.tsx
 │   │   │   └── MaterialsClient.tsx
-│   │   ├── notifications/                # Bildiriş göndərmə
+│   │   ├── notifications/                # Bildiriş göndərmə (nav bar əlavə edildi)
 │   │   │   ├── page.tsx
 │   │   │   └── NotificationsAdminClient.tsx
-│   │   └── advertisements/               # Elan CRUD
+│   │   └── advertisements/               # Elan CRUD (nav bar əlavə edildi)
 │   │       ├── page.tsx
 │   │       └── AdsClient.tsx
 │   │

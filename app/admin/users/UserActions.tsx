@@ -15,11 +15,113 @@ interface User {
   groupId: string | null;
   emailVerified: Date | string | null;
   isBlocked: boolean;
+  isStudent?: boolean;
   createdAt: Date | string;
   deletedAt?: Date | string | null;
 }
 
 const ALL_ROLES = ["student", "admin", "manager", "reporter", "worker", "teacher"] as const;
+
+export function CreateUserModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<string>("student");
+  const [groupId, setGroupId] = useState("");
+  const [isStudent, setIsStudent] = useState(true);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/groups").then((r) => r.json()).then(setGroups).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setIsStudent(role === "student");
+  }, [role]);
+
+  async function handleCreate() {
+    if (!name.trim() || !email.trim() || !password.trim()) { setError("Ad, e-poçt və şifrə tələb olunur"); return; }
+    if (role === "student" && !groupId) { setError("Tələbə üçün qrup seçin"); return; }
+    setLoading(true);
+    setError("");
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim(), email: email.trim(), password, role, groupId: groupId || null, isStudent }),
+    });
+    setLoading(false);
+    if (res.ok) {
+      router.refresh();
+      onClose();
+    } else {
+      const d = await res.json();
+      setError(d.error ?? "Xəta baş verdi");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-5">Yeni İstifadəçi Yarat</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ad Soyad</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">E-poçt</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Şifrə</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+            <select value={role} onChange={(e) => setRole(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {ALL_ROLES.map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Qrup <span className="text-gray-400 font-normal">(tələbələr üçün)</span>
+            </label>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">— Qrup seçin —</option>
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+          {role !== "student" && (
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setIsStudent(!isStudent)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isStudent ? "bg-blue-600" : "bg-gray-300"}`}>
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isStudent ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+              <span className="text-sm text-gray-700">Tələbə kimi qeydiyyat</span>
+            </div>
+          )}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={handleCreate} disabled={loading} className="btn-primary flex-1">
+            {loading ? "Yaradılır..." : "Yarat"}
+          </button>
+          <button onClick={onClose} className="btn-secondary flex-1">Ləğv et</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function EditUserModal({ user, onClose }: { user: User; onClose: () => void }) {
   const router = useRouter();
