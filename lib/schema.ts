@@ -190,6 +190,12 @@ export const advertisements = pgTable("advertisements", {
   createdAt:  timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── NOTIFICATION READS ──────────────────────────────────────────────────
+export const notificationReads = pgTable("notification_reads", {
+  notificationId: text("notification_id").notNull().references(() => notifications.id, { onDelete: "cascade" }),
+  userId:         text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, (t) => ({ pk: primaryKey({ columns: [t.notificationId, t.userId] }) }));
+
 // ─── ACTIVITY LOGS ───────────────────────────────────────────────────────
 export const activityLogs = pgTable("activity_logs", {
   id:         text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -220,3 +226,4 @@ export type Message        = typeof messages.$inferSelect;
 export type Notification   = typeof notifications.$inferSelect;
 export type Advertisement  = typeof advertisements.$inferSelect;
 export type ActivityLog    = typeof activityLogs.$inferSelect;
+export type NotificationRead = typeof notificationReads.$inferSelect;

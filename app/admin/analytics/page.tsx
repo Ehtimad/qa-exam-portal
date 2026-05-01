@@ -1,9 +1,9 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, examAttempts, questions, activityLogs } from "@/lib/schema";
-import { desc, gte, count, eq, isNull, ne } from "drizzle-orm";
+import { desc, gte, count, eq, isNull } from "drizzle-orm";
+import CollapsibleSection from "@/components/CollapsibleSection";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { canViewAnalytics } from "@/lib/rbac";
 
 const LECTURE_NAMES: Record<number, string> = {
@@ -140,230 +140,208 @@ export default async function AdminAnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center gap-6 flex-wrap">
-          <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">← Admin</Link>
-          <span className="font-semibold text-gray-900">Analitika</span>
-          <Link href="/admin/users"     className="text-sm text-gray-500 hover:text-gray-900">İstifadəçilər</Link>
-          <Link href="/admin/online"    className="text-sm text-gray-500 hover:text-gray-900">Online</Link>
-          <Link href="/admin/results"   className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
-          <Link href="/admin/questions" className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
-          <Link href="/admin/exams"     className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
-          <Link href="/admin/groups"    className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
-          <Link href="/admin/materials" className="text-sm text-gray-500 hover:text-gray-900">Materiallar</Link>
-          <Link href="/admin/notifications" className="text-sm text-gray-500 hover:text-gray-900">Bildirişlər</Link>
-          <Link href="/admin/advertisements" className="text-sm text-gray-500 hover:text-gray-900">Elanlar</Link>
-          <Link href="/admin/activity"  className="text-sm text-gray-500 hover:text-gray-900">Fəaliyyət</Link>
-          <Link href="/messages"        className="text-sm text-gray-500 hover:text-gray-900">Mesajlar</Link>
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+
+      {/* Online Users */}
+      <section>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          Online İstifadəçilər
+          <span className="ml-2 text-sm font-normal text-gray-500">(son 5 dəqiqə)</span>
+          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+            {onlineUsers.length} aktiv
+          </span>
+        </h2>
+        <div className="card">
+          {onlineUsers.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-6">Hazırda aktiv istifadəçi yoxdur</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
+                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Qrup</th>
+                    <th className="text-left px-3 py-3 text-gray-500 font-medium">Son aktivlik</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {onlineUsers.map((u) => (
+                    <tr key={u.id} className="border-b border-gray-50">
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
+                          <span className="font-medium text-gray-900">{u.name ?? "–"}</span>
+                          <span className="text-gray-400 text-xs">{u.email}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-gray-500">{u.groupName ?? "–"}</td>
+                      <td className="px-3 py-3 text-gray-500">
+                        {u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleTimeString("az-AZ") : "–"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </nav>
+      </section>
 
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      {/* User Breakdown */}
+      <section>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">İstifadəçi Statistikası</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <div className="card text-center py-4">
+            <div className="text-3xl font-bold text-blue-600">{totalStudents}</div>
+            <div className="text-sm text-gray-500 mt-1">Tələbə</div>
+          </div>
+          <div className="card text-center py-4">
+            <div className="text-3xl font-bold text-green-600">{studentsVerified}</div>
+            <div className="text-sm text-gray-500 mt-1">Təsdiqlənmiş</div>
+          </div>
+          <div className="card text-center py-4">
+            <div className="text-3xl font-bold text-amber-600">{totalStudents - studentsVerified}</div>
+            <div className="text-sm text-gray-500 mt-1">Gözləyir</div>
+          </div>
+          <div className="card text-center py-4">
+            <div className="text-3xl font-bold text-purple-600">{totalTeachers}</div>
+            <div className="text-sm text-gray-500 mt-1">Müəllim</div>
+          </div>
+          <div className="card text-center py-4">
+            <div className="text-3xl font-bold text-gray-600">{totalStaff}</div>
+            <div className="text-sm text-gray-500 mt-1">Digər işçi</div>
+          </div>
+        </div>
+      </section>
 
-        {/* Online Users */}
+      {/* Top Active Users (last 30 days) */}
+      {teacherActivity.length > 0 && (
         <section>
           <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Online İstifadəçilər
-            <span className="ml-2 text-sm font-normal text-gray-500">(son 5 dəqiqə)</span>
-            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-              {onlineUsers.length} aktiv
-            </span>
+            Aktiv İstifadəçilər
+            <span className="ml-2 text-sm font-normal text-gray-400">(son 30 gün, fəaliyyət jurnalına görə)</span>
           </h2>
-          <div className="card">
-            {onlineUsers.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-6">Hazırda aktiv istifadəçi yoxdur</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50">
-                      <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
-                      <th className="text-left px-3 py-3 text-gray-500 font-medium">Qrup</th>
-                      <th className="text-left px-3 py-3 text-gray-500 font-medium">Son aktivlik</th>
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">E-poçt</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Əməliyyat sayı</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teacherActivity.map((row, i) => (
+                    <tr key={row.actorEmail ?? i} className="border-b border-gray-50">
+                      <td className="px-4 py-3 text-gray-400">{i + 1}</td>
+                      <td className="px-4 py-3 text-gray-700">{row.actorEmail ?? "–"}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                          {row.actions}
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {onlineUsers.map((u) => (
-                      <tr key={u.id} className="border-b border-gray-50">
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
-                            <span className="font-medium text-gray-900">{u.name ?? "–"}</span>
-                            <span className="text-gray-400 text-xs">{u.email}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-gray-500">{u.groupName ?? "–"}</td>
-                        <td className="px-3 py-3 text-gray-500">
-                          {u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleTimeString("az-AZ") : "–"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* User Breakdown */}
-        <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">İstifadəçi Statistikası</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="card text-center py-4">
-              <div className="text-3xl font-bold text-blue-600">{totalStudents}</div>
-              <div className="text-sm text-gray-500 mt-1">Tələbə</div>
-            </div>
-            <div className="card text-center py-4">
-              <div className="text-3xl font-bold text-green-600">{studentsVerified}</div>
-              <div className="text-sm text-gray-500 mt-1">Təsdiqlənmiş</div>
-            </div>
-            <div className="card text-center py-4">
-              <div className="text-3xl font-bold text-amber-600">{totalStudents - studentsVerified}</div>
-              <div className="text-sm text-gray-500 mt-1">Gözləyir</div>
-            </div>
-            <div className="card text-center py-4">
-              <div className="text-3xl font-bold text-purple-600">{totalTeachers}</div>
-              <div className="text-sm text-gray-500 mt-1">Müəllim</div>
-            </div>
-            <div className="card text-center py-4">
-              <div className="text-3xl font-bold text-gray-600">{totalStaff}</div>
-              <div className="text-sm text-gray-500 mt-1">Digər işçi</div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
+      )}
 
-        {/* Top Active Users (last 30 days) */}
-        {teacherActivity.length > 0 && (
-          <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              Aktiv İstifadəçilər
-              <span className="ml-2 text-sm font-normal text-gray-400">(son 30 gün, fəaliyyət jurnalına görə)</span>
-            </h2>
+      {analysisError ? (
+        <div className="card">
+          <p className="text-amber-600 text-sm text-center py-6">
+            Sual analizi üçün məlumat yüklənə bilmədi. Sistem yenilənir, bir az sonra yenidən cəhd edin.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Lecture error analysis */}
+          <CollapsibleSection title="Mühazirə üzrə Xəta Analizi" defaultOpen={false}>
             <div className="card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50">
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">E-poçt</th>
-                      <th className="text-right px-4 py-3 text-gray-500 font-medium">Əməliyyat sayı</th>
+                      <th className="text-left px-3 py-3 text-gray-500 font-medium">Mühazirə</th>
+                      <th className="text-right px-3 py-3 text-gray-500 font-medium">Cəhd sayı</th>
+                      <th className="text-right px-3 py-3 text-gray-500 font-medium">Xəta sayı</th>
+                      <th className="text-right px-3 py-3 text-gray-500 font-medium">Xəta %</th>
+                      <th className="px-3 py-3 text-gray-500 font-medium">Proqres</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {teacherActivity.map((row, i) => (
-                      <tr key={row.actorEmail ?? i} className="border-b border-gray-50">
-                        <td className="px-4 py-3 text-gray-400">{i + 1}</td>
-                        <td className="px-4 py-3 text-gray-700">{row.actorEmail ?? "–"}</td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                            {row.actions}
+                    {lecStats.map((l) => (
+                      <tr key={l.lectureId} className="border-b border-gray-50">
+                        <td className="px-3 py-3 font-medium text-gray-900">
+                          M{l.lectureId}: {LECTURE_NAMES[l.lectureId] ?? `Mühazirə ${l.lectureId}`}
+                        </td>
+                        <td className="px-3 py-3 text-right text-gray-600">{l.totalAttempts}</td>
+                        <td className="px-3 py-3 text-right text-gray-600">{l.totalErrors}</td>
+                        <td className="px-3 py-3 text-right">
+                          <span className={`font-medium ${l.errorRate >= 70 ? "text-red-600" : l.errorRate >= 40 ? "text-amber-600" : "text-green-600"}`}>
+                            {l.errorRate}%
                           </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="w-32 bg-gray-100 rounded-full h-2">
+                            <div className={`h-2 rounded-full ${l.errorRate >= 70 ? "bg-red-400" : l.errorRate >= 40 ? "bg-amber-400" : "bg-green-400"}`}
+                              style={{ width: `${l.errorRate}%` }} />
+                          </div>
                         </td>
                       </tr>
                     ))}
+                    {lecStats.length === 0 && (
+                      <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">Məlumat yoxdur</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
-          </section>
-        )}
+          </CollapsibleSection>
 
-        {analysisError ? (
-          <div className="card">
-            <p className="text-amber-600 text-sm text-center py-6">
-              Sual analizi üçün məlumat yüklənə bilmədi. Sistem yenilənir, bir az sonra yenidən cəhd edin.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Lecture error analysis */}
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Mühazirə üzrə Xəta Analizi</h2>
-              <div className="card overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Mühazirə</th>
-                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Cəhd sayı</th>
-                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Xəta sayı</th>
-                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Xəta %</th>
-                        <th className="px-3 py-3 text-gray-500 font-medium">Proqres</th>
+          {/* Top 10 hardest */}
+          <CollapsibleSection title={<>Ən Çətin 10 Sual <span className="text-sm font-normal text-gray-400">(ən az 3 cəhd)</span></>} defaultOpen={false}>
+            <div className="card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-3 py-3 text-gray-500 font-medium w-8">#</th>
+                      <th className="text-left px-3 py-3 text-gray-500 font-medium">Sual</th>
+                      <th className="text-left px-3 py-3 text-gray-500 font-medium">Mühazirə</th>
+                      <th className="text-right px-3 py-3 text-gray-500 font-medium">Cəhd</th>
+                      <th className="text-right px-3 py-3 text-gray-500 font-medium">Xəta %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {top10Hardest.map((q, i) => (
+                      <tr key={q.id} className="border-b border-gray-50">
+                        <td className="px-3 py-3 text-gray-400">{i + 1}</td>
+                        <td className="px-3 py-3 text-gray-900 max-w-sm">
+                          <span className="line-clamp-2">{q.text}</span>
+                        </td>
+                        <td className="px-3 py-3 text-gray-500">M{q.lectureId}</td>
+                        <td className="px-3 py-3 text-right text-gray-600">{q.attempts}</td>
+                        <td className="px-3 py-3 text-right">
+                          <span className={`font-bold ${q.errorRate >= 70 ? "text-red-600" : q.errorRate >= 40 ? "text-amber-600" : "text-green-600"}`}>
+                            {q.errorRate}%
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {lecStats.map((l) => (
-                        <tr key={l.lectureId} className="border-b border-gray-50">
-                          <td className="px-3 py-3 font-medium text-gray-900">
-                            M{l.lectureId}: {LECTURE_NAMES[l.lectureId] ?? `Mühazirə ${l.lectureId}`}
-                          </td>
-                          <td className="px-3 py-3 text-right text-gray-600">{l.totalAttempts}</td>
-                          <td className="px-3 py-3 text-right text-gray-600">{l.totalErrors}</td>
-                          <td className="px-3 py-3 text-right">
-                            <span className={`font-medium ${l.errorRate >= 70 ? "text-red-600" : l.errorRate >= 40 ? "text-amber-600" : "text-green-600"}`}>
-                              {l.errorRate}%
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="w-32 bg-gray-100 rounded-full h-2">
-                              <div className={`h-2 rounded-full ${l.errorRate >= 70 ? "bg-red-400" : l.errorRate >= 40 ? "bg-amber-400" : "bg-green-400"}`}
-                                style={{ width: `${l.errorRate}%` }} />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {lecStats.length === 0 && (
-                        <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">Məlumat yoxdur</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                    {top10Hardest.length === 0 && (
+                      <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">Məlumat yoxdur</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </section>
-
-            {/* Top 10 hardest */}
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Ən Çətin 10 Sual <span className="text-sm font-normal text-gray-400">(ən az 3 cəhd)</span></h2>
-              <div className="card overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium w-8">#</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Sual</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Mühazirə</th>
-                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Cəhd</th>
-                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Xəta %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {top10Hardest.map((q, i) => (
-                        <tr key={q.id} className="border-b border-gray-50">
-                          <td className="px-3 py-3 text-gray-400">{i + 1}</td>
-                          <td className="px-3 py-3 text-gray-900 max-w-sm">
-                            <span className="line-clamp-2">{q.text}</span>
-                          </td>
-                          <td className="px-3 py-3 text-gray-500">M{q.lectureId}</td>
-                          <td className="px-3 py-3 text-right text-gray-600">{q.attempts}</td>
-                          <td className="px-3 py-3 text-right">
-                            <span className={`font-bold ${q.errorRate >= 70 ? "text-red-600" : q.errorRate >= 40 ? "text-amber-600" : "text-green-600"}`}>
-                              {q.errorRate}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                      {top10Hardest.length === 0 && (
-                        <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">Məlumat yoxdur</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
-          </>
-        )}
-      </div>
+            </div>
+          </CollapsibleSection>
+        </>
+      )}
     </div>
   );
 }

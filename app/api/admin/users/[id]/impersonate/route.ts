@@ -18,7 +18,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
 
-  const [target] = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, id)).limit(1);
+  const [target] = await db.select({ id: users.id, role: users.role, email: users.email }).from(users).where(eq(users.id, id)).limit(1);
   if (!target) return NextResponse.json({ error: "İstifadəçi tapılmadı" }, { status: 404 });
   if (target.role === "admin") return NextResponse.json({ error: "Admin hesabına keçid mümkün deyil" }, { status: 403 });
 
@@ -38,7 +38,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     action:     "impersonation.start",
     targetType: "user",
     targetId:   id,
-    details:    { targetRole: target.role },
+    details:    { targetRole: target.role, targetEmail: target.email },
   });
 
   return NextResponse.json({ token });

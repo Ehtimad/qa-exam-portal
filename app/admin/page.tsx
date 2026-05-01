@@ -4,13 +4,11 @@ import { users, examAttempts } from "@/lib/schema";
 import { eq, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { signOut } from "@/lib/auth";
-import { isStaff, canManageUsers, canViewResults, canViewAnalytics, canManageQuestions, canManageExams, canManageGroups, canManageMaterials, canSendNotifications, canManageAds } from "@/lib/rbac";
+import { isStaff } from "@/lib/rbac";
 
 export default async function AdminPage() {
   const session = await auth();
   if (!session || !isStaff(session.user.role)) redirect("/dashboard");
-  const role = session.user.role;
 
   const [totalStudents] = await db
     .select({ count: count() })
@@ -38,101 +36,73 @@ export default async function AdminPage() {
     .limit(5);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="font-semibold text-gray-900">
-              {role === "teacher" ? "Müəllim Paneli" : "Admin Panel"}
-            </span>
-            <Link href="/admin" className="text-sm text-blue-600 font-medium">Dashboard</Link>
-            {canManageUsers(role)    && <Link href="/admin/users"     className="text-sm text-gray-600 hover:text-gray-900">İstifadəçilər</Link>}
-            {canViewResults(role)    && <Link href="/admin/results"   className="text-sm text-gray-600 hover:text-gray-900">Nəticələr</Link>}
-            {canManageQuestions(role) && <Link href="/admin/questions" className="text-sm text-gray-600 hover:text-gray-900">Suallar</Link>}
-            {canManageExams(role)    && <Link href="/admin/exams"     className="text-sm text-gray-600 hover:text-gray-900">İmtahanlar</Link>}
-            {canViewAnalytics(role)  && <Link href="/admin/analytics" className="text-sm text-gray-600 hover:text-gray-900">Analitika</Link>}
-            {canManageGroups(role)   && <Link href="/admin/groups"    className="text-sm text-gray-600 hover:text-gray-900">Qruplar</Link>}
-            {canManageMaterials(role) && <Link href="/admin/materials" className="text-sm text-gray-600 hover:text-gray-900">Materiallar</Link>}
-            {canSendNotifications(role) && <Link href="/admin/notifications" className="text-sm text-gray-600 hover:text-gray-900">Bildirişlər</Link>}
-            {canManageAds(role)      && <Link href="/admin/advertisements" className="text-sm text-gray-600 hover:text-gray-900">Elanlar</Link>}
-            {canManageUsers(role)    && <Link href="/admin/online"    className="text-sm text-gray-600 hover:text-gray-900">Online</Link>}
-            {canManageUsers(role)    && <Link href="/admin/activity"  className="text-sm text-gray-600 hover:text-gray-900">Fəaliyyət</Link>}
-            <Link href="/messages" className="text-sm text-gray-600 hover:text-gray-900">Mesajlar</Link>
-          </div>
-          <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>
-            <button type="submit" className="btn-secondary text-sm py-1.5 px-3">Çıxış</button>
-          </form>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="card text-center">
+          <div className="text-3xl font-bold text-blue-600">{totalStudents.count}</div>
+          <div className="text-gray-500 text-sm mt-1">Ümumi tələbə</div>
         </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="card text-center">
-            <div className="text-3xl font-bold text-blue-600">{totalStudents.count}</div>
-            <div className="text-gray-500 text-sm mt-1">Ümumi tələbə</div>
+        <div className="card text-center">
+          <div className="text-3xl font-bold text-blue-600">
+            <Link href="/admin/users" className="hover:underline">{totalStudents.count}</Link>
           </div>
-          <div className="card text-center">
-            <div className="text-3xl font-bold text-blue-600">
-              <Link href="/admin/users" className="hover:underline">{totalStudents.count}</Link>
-            </div>
-            <div className="text-gray-500 text-sm mt-1">
-              <Link href="/admin/users" className="hover:underline">Tələbə siyahısı →</Link>
-            </div>
-          </div>
-          <div className="card text-center">
-            <div className="text-3xl font-bold text-green-600">{totalAttempts.count}</div>
-            <div className="text-gray-500 text-sm mt-1">İmtahan cəhdi</div>
+          <div className="text-gray-500 text-sm mt-1">
+            <Link href="/admin/users" className="hover:underline">Tələbə siyahısı →</Link>
           </div>
         </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Son nəticələr</h2>
-            <Link href="/admin/results" className="text-sm text-blue-600 hover:underline">
-              Hamısı →
-            </Link>
-          </div>
-          {recentAttempts.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">Hələ heç bir nəticə yoxdur</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 text-gray-500 font-medium">Tələbə</th>
-                  <th className="text-right py-2 text-gray-500 font-medium">Bal</th>
-                  <th className="text-right py-2 text-gray-500 font-medium">Faiz</th>
-                  <th className="text-right py-2 text-gray-500 font-medium">Tarix</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentAttempts.map((a) => {
-                  const pct = Math.round((a.score / a.maxScore) * 100);
-                  return (
-                    <tr key={a.id} className="border-b border-gray-50">
-                      <td className="py-3">
-                        <div className="font-medium text-gray-900">{a.userName ?? "–"}</div>
-                        <div className="text-gray-400 text-xs">{a.userEmail}</div>
-                      </td>
-                      <td className="py-3 text-right font-semibold text-blue-600">
-                        {a.score}/{a.maxScore}
-                      </td>
-                      <td className="py-3 text-right">
-                        <span className={`font-medium ${pct >= 70 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-600"}`}>
-                          {pct}%
-                        </span>
-                      </td>
-                      <td className="py-3 text-right text-gray-500">
-                        {new Date(a.completedAt).toLocaleDateString("az-AZ")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+        <div className="card text-center">
+          <div className="text-3xl font-bold text-green-600">{totalAttempts.count}</div>
+          <div className="text-gray-500 text-sm mt-1">İmtahan cəhdi</div>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Son nəticələr</h2>
+          <Link href="/admin/results" className="text-sm text-blue-600 hover:underline">
+            Hamısı →
+          </Link>
+        </div>
+        {recentAttempts.length === 0 ? (
+          <p className="text-gray-500 text-sm text-center py-8">Hələ heç bir nəticə yoxdur</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="text-left py-2 text-gray-500 font-medium">Tələbə</th>
+                <th className="text-right py-2 text-gray-500 font-medium">Bal</th>
+                <th className="text-right py-2 text-gray-500 font-medium">Faiz</th>
+                <th className="text-right py-2 text-gray-500 font-medium">Tarix</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentAttempts.map((a) => {
+                const pct = Math.round((a.score / a.maxScore) * 100);
+                return (
+                  <tr key={a.id} className="border-b border-gray-50">
+                    <td className="py-3">
+                      <div className="font-medium text-gray-900">{a.userName ?? "–"}</div>
+                      <div className="text-gray-400 text-xs">{a.userEmail}</div>
+                    </td>
+                    <td className="py-3 text-right font-semibold text-blue-600">
+                      {a.score}/{a.maxScore}
+                    </td>
+                    <td className="py-3 text-right">
+                      <span className={`font-medium ${pct >= 70 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-600"}`}>
+                        {pct}%
+                      </span>
+                    </td>
+                    <td className="py-3 text-right text-gray-500">
+                      {new Date(a.completedAt).toLocaleDateString("az-AZ")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

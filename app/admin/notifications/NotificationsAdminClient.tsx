@@ -42,6 +42,15 @@ export default function NotificationsAdminClient() {
 
   useEffect(() => { load(); }, []);
 
+  async function deleteNotif(id: string) {
+    await fetch("/api/admin/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    load();
+  }
+
   async function send() {
     setError(""); setSuccess("");
     if (!title || !message) { setError("Başlıq və mətn tələb olunur"); return; }
@@ -128,13 +137,22 @@ export default function NotificationsAdminClient() {
         {sent.map((n) => (
           <div key={n.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">{n.title}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
               </div>
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full flex-shrink-0">
-                {n.type === "all" ? "Hamıya" : n.type === "group" ? "Qrupa" : "Fərdi"}
-              </span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                  {n.type === "all" ? "Hamıya" : n.type === "group" ? "Qrupa" : "Fərdi"}
+                </span>
+                <button
+                  onClick={() => deleteNotif(n.id)}
+                  className="text-xs text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded hover:bg-red-50"
+                  title="Sil"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <p className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString("az-AZ")}</p>
           </div>

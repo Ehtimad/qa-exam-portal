@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { examAttempts, users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 import { questions } from "@/lib/questions";
 import { ResetAttemptButton } from "../ResetButton";
 
@@ -42,15 +41,7 @@ export default async function AdminResultDetailPage({ params }: { params: Promis
     : "–";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center gap-6">
-          <Link href="/admin/results" className="text-sm text-gray-600 hover:text-gray-900">← Nəticələr</Link>
-          <span className="font-semibold text-gray-900">Detallı Nəticə</span>
-        </div>
-      </nav>
-
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Student info + summary */}
         <div className="card mb-6">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -144,6 +135,5 @@ export default async function AdminResultDetailPage({ params }: { params: Promis
           })}
         </div>
       </div>
-    </div>
   );
 }

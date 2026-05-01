@@ -68,121 +68,109 @@ export default async function ActivityPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center gap-6 flex-wrap">
-          <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">← Admin</Link>
-          <span className="font-semibold text-gray-900">Fəaliyyət Jurnalı</span>
-          <Link href="/admin/users"   className="text-sm text-gray-500 hover:text-gray-900">İstifadəçilər</Link>
-          <Link href="/admin/online"  className="text-sm text-gray-500 hover:text-gray-900">Online</Link>
-          <Link href="/admin/results" className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
-        </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Fəaliyyət Jurnalı</h1>
-        </div>
-
-        {/* Filters */}
-        <form method="GET" className="card p-4 mb-6 flex flex-wrap gap-3 items-end">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Əməliyyat</label>
-            <select name="action" defaultValue={action}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">Hamısı</option>
-              {Object.keys(ACTION_LABELS).map((a) => (
-                <option key={a} value={a}>{ACTION_LABELS[a]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Aktor (e-poçt)</label>
-            <input type="text" name="actor" defaultValue={actor} placeholder="admin@..."
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Başlanğıc</label>
-            <input type="date" name="from" defaultValue={from}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Son</label>
-            <input type="date" name="to" defaultValue={to}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <button type="submit" className="btn-primary text-sm">Filtrele</button>
-          <Link href="/admin/activity" className="btn-secondary text-sm">Sıfırla</Link>
-        </form>
-
-        {dbError ? (
-          <div className="card text-center py-10">
-            <p className="text-amber-700">Fəaliyyət cədvəli hazırlanır. Bir az sonra yenidən cəhd edin.</p>
-          </div>
-        ) : (
-          <div className="card overflow-hidden">
-            {logs.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-10">Fəaliyyət tapılmadı</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50">
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Vaxt</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Əməliyyat</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Aktor</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Hədəf</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Təfsilatlar</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map((log) => {
-                      let details: Record<string, unknown> = {};
-                      try { details = log.details ? JSON.parse(log.details) : {}; } catch { /**/ }
-                      return (
-                        <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50">
-                          <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
-                            {new Date(log.createdAt).toLocaleString("az-AZ")}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${actionColor(log.action)}`}>
-                              {ACTION_LABELS[log.action] ?? log.action}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">{log.actorEmail ?? "–"}</td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {log.targetType && <span className="text-xs text-gray-400 mr-1">{log.targetType}</span>}
-                            {log.targetId ? <span className="font-mono text-xs">{log.targetId.slice(0, 8)}…</span> : "–"}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500 max-w-xs">
-                            {Object.keys(details).length > 0 ? (
-                              <span className="text-xs text-gray-400 font-mono truncate block" title={JSON.stringify(details)}>
-                                {Object.entries(details).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(" · ")}
-                              </span>
-                            ) : "–"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {logs.length === limit && (
-          <div className="flex justify-end mt-4 gap-2">
-            {page > 1 && (
-              <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page - 1}`}
-                className="btn-secondary text-sm">← Əvvəlki</Link>
-            )}
-            <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page + 1}`}
-              className="btn-primary text-sm">Növbəti →</Link>
-          </div>
-        )}
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Fəaliyyət Jurnalı</h1>
       </div>
+
+      {/* Filters */}
+      <form method="GET" className="card p-4 mb-6 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Əməliyyat</label>
+          <select name="action" defaultValue={action}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">Hamısı</option>
+            {Object.keys(ACTION_LABELS).map((a) => (
+              <option key={a} value={a}>{ACTION_LABELS[a]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Aktor (e-poçt)</label>
+          <input type="text" name="actor" defaultValue={actor} placeholder="admin@..."
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Başlanğıc</label>
+          <input type="date" name="from" defaultValue={from}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Son</label>
+          <input type="date" name="to" defaultValue={to}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <button type="submit" className="btn-primary text-sm">Filtrele</button>
+        <Link href="/admin/activity" className="btn-secondary text-sm">Sıfırla</Link>
+      </form>
+
+      {dbError ? (
+        <div className="card text-center py-10">
+          <p className="text-amber-700">Fəaliyyət cədvəli hazırlanır. Bir az sonra yenidən cəhd edin.</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          {logs.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-10">Fəaliyyət tapılmadı</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Vaxt</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Əməliyyat</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Aktor</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Hədəf</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Təfsilatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((log) => {
+                    let details: Record<string, unknown> = {};
+                    try { details = log.details ? JSON.parse(log.details) : {}; } catch { /**/ }
+                    return (
+                      <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                          {new Date(log.createdAt).toLocaleString("az-AZ")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${actionColor(log.action)}`}>
+                            {ACTION_LABELS[log.action] ?? log.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{log.actorEmail ?? "–"}</td>
+                        <td className="px-4 py-3 text-gray-500">
+                          {log.targetType && <span className="text-xs text-gray-400 mr-1">{log.targetType}</span>}
+                          {log.targetId ? <span className="font-mono text-xs">{log.targetId.slice(0, 8)}…</span> : "–"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 max-w-xs">
+                          {Object.keys(details).length > 0 ? (
+                            <span className="text-xs text-gray-400 font-mono truncate block" title={JSON.stringify(details)}>
+                              {Object.entries(details).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                            </span>
+                          ) : "–"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {logs.length === limit && (
+        <div className="flex justify-end mt-4 gap-2">
+          {page > 1 && (
+            <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page - 1}`}
+              className="btn-secondary text-sm">← Əvvəlki</Link>
+          )}
+          <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page + 1}`}
+            className="btn-primary text-sm">Növbəti →</Link>
+        </div>
+      )}
     </div>
   );
 }

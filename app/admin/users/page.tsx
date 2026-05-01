@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { users, groups } from "@/lib/schema";
 import { asc, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { UserRow, CreateUserModal } from "./UserActions";
 import { Suspense } from "react";
 import UsersFilterBar from "./UsersFilterBar";
@@ -55,118 +54,98 @@ export default async function AdminUsersPage({
   const pendingCount     = students.filter((s) => !s.emailVerified).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center gap-6 flex-wrap">
-          <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">← Admin</Link>
-          <span className="font-semibold text-gray-900">İstifadəçilər</span>
-          <Link href="/admin/results"       className="text-sm text-gray-500 hover:text-gray-900">Nəticələr</Link>
-          <Link href="/admin/questions"     className="text-sm text-gray-500 hover:text-gray-900">Suallar</Link>
-          <Link href="/admin/exams"         className="text-sm text-gray-500 hover:text-gray-900">İmtahanlar</Link>
-          <Link href="/admin/analytics"     className="text-sm text-gray-500 hover:text-gray-900">Analitika</Link>
-          <Link href="/admin/online"        className="text-sm text-gray-500 hover:text-gray-900">Online</Link>
-          <Link href="/admin/groups"        className="text-sm text-gray-500 hover:text-gray-900">Qruplar</Link>
-          <Link href="/admin/materials"     className="text-sm text-gray-500 hover:text-gray-900">Materiallar</Link>
-          <Link href="/admin/notifications" className="text-sm text-gray-500 hover:text-gray-900">Bildirişlər</Link>
-          <Link href="/admin/advertisements" className="text-sm text-gray-500 hover:text-gray-900">Elanlar</Link>
-          <Link href="/admin/activity"      className="text-sm text-gray-500 hover:text-gray-900">Fəaliyyət</Link>
-          <Link href="/messages"            className="text-sm text-gray-500 hover:text-gray-900">Mesajlar</Link>
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      {dbError ? (
+        <div className="card text-center py-10">
+          <p className="text-amber-700 font-medium mb-2">Verilənlər bazası yenilənir...</p>
+          <p className="text-gray-500 text-sm">Bir neçə saniyə sonra səhifəni yeniləyin.</p>
         </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {dbError ? (
-          <div className="card text-center py-10">
-            <p className="text-amber-700 font-medium mb-2">Verilənlər bazası yenilənir...</p>
-            <p className="text-gray-500 text-sm">Bir neçə saniyə sonra səhifəni yeniləyin.</p>
-          </div>
-        ) : (
-          <>
-            {/* ── Staff section ── */}
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-gray-900">Sistem İşçiləri
-                  <span className="ml-2 text-sm font-normal text-gray-400">({filteredStaff.length})</span>
-                </h2>
-                <CreateUserButton />
-              </div>
-              <div className="card overflow-hidden">
-                {filteredStaff.length === 0 ? (
-                  <p className="text-gray-400 text-sm text-center py-6">Sistem işçisi yoxdur</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-100 bg-gray-50">
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Rol</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
-                          <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredStaff.map((u) => (
-                          <UserRow key={u.id} student={u} showRole />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* ── Students section ── */}
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Tələbələr
-                    <span className="ml-2 text-sm font-normal text-gray-400">
-                      {filteredStudents.length} / {students.length}
-                    </span>
-                  </h2>
-                  {pendingCount > 0 && (
-                    <p className="text-amber-700 text-sm mt-0.5">{pendingCount} tələbə admin təsdiqini gözləyir</p>
-                  )}
+      ) : (
+        <>
+          {/* ── Staff section ── */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-gray-900">Sistem İşçiləri
+                <span className="ml-2 text-sm font-normal text-gray-400">({filteredStaff.length})</span>
+              </h2>
+              <CreateUserButton />
+            </div>
+            <div className="card overflow-hidden">
+              {filteredStaff.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-6">Sistem işçisi yoxdur</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Rol</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
+                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStaff.map((u) => (
+                        <UserRow key={u.id} student={u} showRole />
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              )}
+            </div>
+          </section>
 
-              <Suspense>
-                <UsersFilterBar groups={allGroups} />
-              </Suspense>
-
-              <div className="card overflow-hidden mt-3">
-                {filteredStudents.length === 0 ? (
-                  <p className="text-gray-500 text-sm text-center py-8">
-                    {students.length === 0 ? "Hələ heç bir tələbə yoxdur" : "Filter nəticəsi tapılmadı"}
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-100 bg-gray-50">
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Qrup</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
-                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
-                          <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredStudents.map((student) => (
-                          <UserRow key={student.id} student={student} />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+          {/* ── Students section ── */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Tələbələr
+                  <span className="ml-2 text-sm font-normal text-gray-400">
+                    {filteredStudents.length} / {students.length}
+                  </span>
+                </h2>
+                {pendingCount > 0 && (
+                  <p className="text-amber-700 text-sm mt-0.5">{pendingCount} tələbə admin təsdiqini gözləyir</p>
                 )}
               </div>
-            </section>
-          </>
-        )}
-      </div>
+            </div>
+
+            <Suspense>
+              <UsersFilterBar groups={allGroups} />
+            </Suspense>
+
+            <div className="card overflow-hidden mt-3">
+              {filteredStudents.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-8">
+                  {students.length === 0 ? "Hələ heç bir tələbə yoxdur" : "Filter nəticəsi tapılmadı"}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Qrup</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
+                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
+                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((student) => (
+                        <UserRow key={student.id} student={student} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }

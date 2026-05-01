@@ -225,6 +225,13 @@ export async function initDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS notification_reads (
+      notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (notification_id, user_id)
+    )`;
+
   // ── Seed admin ───────────────────────────────────────────────────────
   const [adminRow] = await sql`SELECT count(*)::int AS c FROM users WHERE role='admin'`;
   if ((adminRow.c as number) === 0) {

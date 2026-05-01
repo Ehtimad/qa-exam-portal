@@ -1,10 +1,11 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { notifications, users } from "@/lib/schema";
+import { notifications } from "@/lib/schema";
 import { canSendNotifications } from "@/lib/rbac";
 import { pusher } from "@/lib/pusher";
-import { eq, isNull, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { logActivity } from "@/lib/activity";
 
 export async function GET() {
   const session = await auth();
@@ -27,23 +28,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "title, message, type required" }, { status: 400 });
   }
 
+  let row: typeof notifications.$inferSelect;
+
   if (type === "individual" && userId) {
-    const [row] = await db.insert(notifications).values({ title, message, type, userId }).returning();
+    [row] = await db.insert(notifications).values({ title, message, type, userId }).returning();
     await pusher.trigger(`private-user-${userId}`, "notification", row);
-    return NextResponse.json(row);
-  }
-
-  if (type === "group" && groupId) {
-    const [row] = await db.insert(notifications).values({ title, message, type, groupId }).returning();
+  } else if (type === "group" && groupId) {
+    [row] = await db.insert(notifications).values({ title, message, type, groupId }).returning();
     await pusher.trigger(`group-${groupId}`, "notification", row);
-    return NextResponse.json(row);
-  }
-
-  if (type === "all") {
-    const [row] = await db.insert(notifications).values({ title, message, type }).returning();
+  } else if (type === "all") {
+    [row] = await db.insert(notifications).values({ title, message, type }).returning();
     await pusher.trigger("notifications", "broadcast", row);
-    return NextResponse.json(row);
+  } else {
+    return NextResponse.json({ error: "Invalid type/target combination" }, { status: 400 });
   }
 
-  return NextResponse.json({ error: "Invalid type/target combination" }, { status: 400 });
+  await logActivity({
+    actorId:    session.user.id,
+    actorEmail: session.user.email,
+    action:     "notification.send",
+    targetType: "notification",
+    targetId:   row.id,
+    details:    { type, title },
+  });
+
+  return NextResponse.json(row);
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || !canSendNotifications(session.user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await req.json();
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  await db.delete(notifications).where(eq(notifications.id, id));
+
+  return NextResponse.json({ success: true });
 }
