@@ -64,7 +64,14 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  await db.delete(notifications).where(eq(notifications.id, id));
+  const [deleted] = await db.delete(notifications).where(eq(notifications.id, id)).returning();
+
+  if (deleted) {
+    await pusher.trigger("notifications", "notification-deleted", { id });
+    if (deleted.userId) {
+      await pusher.trigger(`private-user-${deleted.userId}`, "notification-deleted", { id });
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

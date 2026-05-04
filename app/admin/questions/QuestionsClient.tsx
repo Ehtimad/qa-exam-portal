@@ -14,7 +14,7 @@ interface Question {
   explanation?: string | null;
 }
 
-interface GroupOption { id: string; name: string; assigned: boolean; }
+interface ExamOption { id: string; name: string; assigned: boolean; }
 
 interface FormState {
   text: string;
@@ -43,10 +43,10 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Group assignment modal state
-  const [groupModalQ, setGroupModalQ] = useState<Question | null>(null);
-  const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
-  const [groupSaving, setGroupSaving] = useState(false);
+  // Exam assignment modal state
+  const [examModalQ, setExamModalQ] = useState<Question | null>(null);
+  const [examOptions, setExamOptions] = useState<ExamOption[]>([]);
+  const [examSaving, setExamSaving] = useState(false);
 
   const filtered = questions.filter((q) =>
     !search || q.text.toLowerCase().includes(search.toLowerCase())
@@ -146,24 +146,24 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  async function openGroupModal(q: Question) {
-    setGroupModalQ(q);
-    setGroupOptions([]);
-    const res = await fetch(`/api/admin/questions/${q.id}/groups`);
-    if (res.ok) setGroupOptions(await res.json());
+  async function openExamModal(q: Question) {
+    setExamModalQ(q);
+    setExamOptions([]);
+    const res = await fetch(`/api/admin/questions/${q.id}/exams`);
+    if (res.ok) setExamOptions(await res.json());
   }
 
-  async function saveGroupAssignments() {
-    if (!groupModalQ) return;
-    setGroupSaving(true);
-    const groupIds = groupOptions.filter((g) => g.assigned).map((g) => g.id);
-    await fetch(`/api/admin/questions/${groupModalQ.id}/groups`, {
+  async function saveExamAssignments() {
+    if (!examModalQ) return;
+    setExamSaving(true);
+    const examIds: string[] = examOptions.filter((e) => e.assigned).map((e) => e.id);
+    await fetch(`/api/admin/questions/${examModalQ.id}/exams`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupIds }),
+      body: JSON.stringify({ examIds }),
     });
-    setGroupSaving(false);
-    setGroupModalQ(null);
+    setExamSaving(false);
+    setExamModalQ(null);
   }
 
   const showForm = showAdd || editQ !== null;
@@ -199,7 +199,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Sual</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Tip</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Bal</th>
-                <th className="text-left px-3 py-3 text-gray-500 font-medium">Qruplar</th>
+                <th className="text-left px-3 py-3 text-gray-500 font-medium">İmtahanlar</th>
                 <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
               </tr>
             </thead>
@@ -215,9 +215,9 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                   </td>
                   <td className="px-3 py-3 text-gray-600">{q.points}</td>
                   <td className="px-3 py-3">
-                    <button onClick={() => openGroupModal(q)}
+                    <button onClick={() => openExamModal(q)}
                       className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded hover:bg-indigo-50 border border-indigo-200">
-                      Qrup Təyin Et
+                      İmtahan Əlavə Et
                     </button>
                   </td>
                   <td className="px-3 py-3 text-right">
@@ -321,36 +321,36 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
         </div>
       )}
 
-      {/* Group assignment modal */}
-      {groupModalQ && (
+      {/* Exam assignment modal */}
+      {examModalQ && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Qrup Təyin Et</h2>
-            <p className="text-xs text-gray-500 mb-4 truncate">Sual #{groupModalQ.id}: {groupModalQ.text.slice(0, 50)}...</p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">İmtahana Əlavə Et</h2>
+            <p className="text-xs text-gray-500 mb-4 truncate">Sual #{examModalQ.id}: {examModalQ.text.slice(0, 50)}...</p>
 
-            {groupOptions.length === 0 ? (
+            {examOptions.length === 0 ? (
               <p className="text-gray-400 text-sm py-4 text-center">Yüklənir...</p>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {groupOptions.map((g) => (
-                  <label key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" checked={g.assigned}
-                      onChange={(e) => setGroupOptions((prev) =>
-                        prev.map((x) => x.id === g.id ? { ...x, assigned: e.target.checked } : x)
+                {examOptions.map((e) => (
+                  <label key={e.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" checked={e.assigned}
+                      onChange={(ev) => setExamOptions((prev) =>
+                        prev.map((x) => x.id === e.id ? { ...x, assigned: ev.target.checked } : x)
                       )}
                       className="w-4 h-4 rounded accent-blue-600" />
-                    <span className="text-sm text-gray-800">{g.name}</span>
+                    <span className="text-sm text-gray-800">{e.name}</span>
                   </label>
                 ))}
               </div>
             )}
 
             <div className="flex gap-3 mt-5">
-              <button onClick={saveGroupAssignments} disabled={groupSaving || groupOptions.length === 0}
+              <button onClick={saveExamAssignments} disabled={examSaving || examOptions.length === 0}
                 className="btn-primary flex-1">
-                {groupSaving ? "Saxlanılır..." : "Saxla"}
+                {examSaving ? "Saxlanılır..." : "Saxla"}
               </button>
-              <button onClick={() => setGroupModalQ(null)} className="btn-secondary flex-1">Ləğv et</button>
+              <button onClick={() => setExamModalQ(null)} className="btn-secondary flex-1">Ləğv et</button>
             </div>
           </div>
         </div>

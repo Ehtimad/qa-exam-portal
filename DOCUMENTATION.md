@@ -1,8 +1,28 @@
-# QA Exam Portal — Tam Sənədləşmə (v6 — Activity Logs, Create User, Online Page)
+# QA Exam Portal — Tam Sənədləşmə (v8 — Exam Assignment, Real-time Deletion, Messages Admin)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
 > **Repo:** GitHub — Ehtimad/qa-exam-portal  
-> **Son versiya:** v6 — Fəaliyyət jurnalı, yeni istifadəçi yaratma (bütün rollar), Online Users səhifəsi, Analitika yeniləndi, Müəllim paneli, nav düymələri
+> **Son versiya:** v8 — Sual→İmtahan məntiqi, real-time silinmə (bildirişlər/elanlar), admin mesaj idarəsi, analitika təmizləndi, paylaşılan AdminNav layout, NavBadges
+
+---
+
+## Changelog
+
+### v8 (2026-05-04)
+- **Sual→İmtahan məntiqi:** Suallar artıq qrupa deyil, birbaşa imtahana bağlanır. QuestionsClient-də "İmtahan Əlavə Et" modal əlavə edildi (`/api/admin/questions/[id]/exams`).
+- **CSV şablon:** `exam_id` sütunu əlavə edildi. Import zamanı sual avtomatik həmin imtahana əlavə edilir.
+- **Analitika:** "Mühazirə üzrə Xəta Analizi" və "Ən Çətin 10 Sual" bölmələri tamamilə silindi.
+- **Real-time silinmə:** Admin bildiriş/elanı sildiyi anda istifadəçi tərəfində Pusher hadisəsi ilə avtomatik yox olur (`notification-deleted`, `ad-deleted`, `ad-updated`).
+- **Mesaj admin idarəsi:** Admin mesajları silə və redaktə edə bilər. `DELETE /api/messages`, `PATCH /api/messages` endpointləri əlavə edildi. Pusher hadisələri: `message-deleted`, `message-updated`.
+- **Paylaşılan AdminNav:** `app/admin/layout.tsx` ilə bütün admin səhifələrini əhatə edir; hər səhifədən ayrı nav blokları silindi.
+- **NavBadges:** Real-time Pusher badge sayacları Mesajlar və Bildirişlər üçün.
+- **notification_reads:** Qrup/hamı tipli bildirişlər üçün oxunma statusu `notification_reads` cədvəlində saxlanır.
+
+### v7 (2026-05-01)
+- Paylaşılan AdminNav layout, CollapsibleSection, NavBadges, bildiriş silmə, analitika collapse, impersonation log yeniləmə.
+
+### v6 (əvvəlki)
+- Fəaliyyət jurnalı, yeni istifadəçi yaratma, Online Users səhifəsi, müəllim rolu.
 
 ---
 

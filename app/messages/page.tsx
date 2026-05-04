@@ -20,7 +20,7 @@ export default async function MessagesPage() {
         </div>
       </nav>
       <div className="flex-1 overflow-hidden">
-        <MessagesClient userId={session.user.id} userName={session.user.name ?? "Sən"} />
+        <MessagesClient userId={session.user.id} userName={session.user.name ?? "Sən"} isAdmin={isAdmin} />
       </div>
     </div>
   );

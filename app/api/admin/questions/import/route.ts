@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { questions } from "@/lib/schema";
+import { questions, examQuestions } from "@/lib/schema";
 import { revalidatePath } from "next/cache";
 import { canUploadQuestions } from "@/lib/rbac";
 
@@ -50,12 +50,13 @@ export async function POST(req: NextRequest) {
 
     try {
       const [idStr, lectureIdStr, text, type, ...rest] = cols;
-      // rest: option_1..option_6, correct_answers, difficulty, points, explanation(optional)
+      // rest: option_1..option_6, correct_answers, difficulty, points, explanation, exam_id(optional)
       const options = rest.slice(0, 6).filter((o) => o.trim() !== "");
       const correctRaw = rest[6] ?? "";
       const difficulty = rest[7] ?? "medium";
       const pointsStr = rest[8] ?? "5";
       const explanation = rest[9] ?? null;
+      const examId = rest[10]?.trim() || null;
 
       const lectureId = parseInt(lectureIdStr);
       const points = parseInt(pointsStr);
@@ -96,6 +97,12 @@ export async function POST(req: NextRequest) {
 
       if (wasExisting) { updated++; }
       else { imported++; if (id === nextId) nextId++; allIds.push({ id }); }
+
+      if (examId) {
+        await db.insert(examQuestions)
+          .values({ examId, questionId: id })
+          .onConflictDoNothing();
+      }
 
     } catch (e) {
       errors.push(`Sətir ${lineNum}: ${String(e).slice(0, 100)}`);

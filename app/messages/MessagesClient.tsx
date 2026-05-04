@@ -23,13 +23,15 @@ interface Message {
   senderName?: string;
 }
 
-export default function MessagesClient({ userId, userName }: { userId: string; userName: string }) {
+export default function MessagesClient({ userId, userName, isAdmin = false }: { userId: string; userName: string; isAdmin?: boolean }) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState("");
   const [active, setActive] = useState<Contact | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +56,12 @@ export default function MessagesClient({ userId, userName }: { userId: string; u
             : c
         )
       );
+    });
+    ch.bind("message-deleted", ({ id }: { id: string }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+    });
+    ch.bind("message-updated", (updated: Message) => {
+      setMessages((prev) => prev.map((m) => m.id === updated.id ? updated : m));
     });
     return () => { ch.unbind_all(); };
   }, [userId, active?.id]);
@@ -85,6 +93,31 @@ export default function MessagesClient({ userId, userName }: { userId: string; u
       setDraft("");
     }
     setSending(false);
+  }
+
+  async function deleteMessage(id: string) {
+    if (!confirm("Bu mesajı silmək istədiyinizə əminsiniz?")) return;
+    await fetch("/api/messages", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  async function saveEdit(id: string) {
+    if (!editDraft.trim()) return;
+    const res = await fetch("/api/messages", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, content: editDraft.trim() }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setMessages((prev) => prev.map((m) => m.id === id ? updated : m));
+    }
+    setEditingId(null);
+    setEditDraft("");
   }
 
   const filtered = contacts.filter((c) =>
@@ -157,17 +190,50 @@ export default function MessagesClient({ userId, userName }: { userId: string; u
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
               {messages.map((m) => {
                 const isMe = m.senderId === userId;
+                const canModify = isMe || isAdmin;
                 return (
-                  <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm ${
-                      isMe
-                        ? "bg-blue-600 text-white rounded-br-sm"
-                        : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm"
-                    }`}>
-                      <p>{m.content}</p>
-                      <p className={`text-xs mt-1 ${isMe ? "text-blue-200" : "text-gray-400"}`}>
-                        {new Date(m.createdAt).toLocaleTimeString("az-AZ", { hour: "2-digit", minute: "2-digit" })}
-                      </p>
+                  <div key={m.id} className={`flex group ${isMe ? "justify-end" : "justify-start"}`}>
+                    <div className="flex flex-col gap-1 max-w-xs lg:max-w-md">
+                      {editingId === m.id ? (
+                        <div className="flex gap-2">
+                          <input
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveEdit(m.id); if (e.key === "Escape") setEditingId(null); }}
+                            className="flex-1 border border-blue-400 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                            autoFocus
+                          />
+                          <button onClick={() => saveEdit(m.id)} className="text-xs text-blue-600 font-medium px-2">✓</button>
+                          <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 px-2">✕</button>
+                        </div>
+                      ) : (
+                        <div className={`px-4 py-2.5 rounded-2xl text-sm ${
+                          isMe
+                            ? "bg-blue-600 text-white rounded-br-sm"
+                            : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm"
+                        }`}>
+                          <p>{m.content}</p>
+                          <p className={`text-xs mt-1 ${isMe ? "text-blue-200" : "text-gray-400"}`}>
+                            {new Date(m.createdAt).toLocaleTimeString("az-AZ", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                      )}
+                      {canModify && editingId !== m.id && (
+                        <div className={`flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMe ? "justify-end" : "justify-start"}`}>
+                          <button
+                            onClick={() => { setEditingId(m.id); setEditDraft(m.content); }}
+                            className="text-[10px] text-gray-400 hover:text-blue-600 px-1.5 py-0.5 rounded hover:bg-gray-100"
+                          >
+                            Redaktə
+                          </button>
+                          <button
+                            onClick={() => deleteMessage(m.id)}
+                            className="text-[10px] text-gray-400 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50"
+                          >
+                            Sil
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

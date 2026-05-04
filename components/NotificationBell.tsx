@@ -29,9 +29,15 @@ export default function NotificationBell({ userId }: { userId: string }) {
     ch.bind("notification", (n: Notification) => {
       setItems((prev) => [n, ...prev]);
     });
+    ch.bind("notification-deleted", ({ id }: { id: string }) => {
+      setItems((prev) => prev.filter((n) => n.id !== id));
+    });
     const broadcast = client.subscribe("notifications");
     broadcast.bind("broadcast", (n: Notification) => {
       setItems((prev) => [n, ...prev]);
+    });
+    broadcast.bind("notification-deleted", ({ id }: { id: string }) => {
+      setItems((prev) => prev.filter((n) => n.id !== id));
     });
     return () => {
       ch.unbind_all();

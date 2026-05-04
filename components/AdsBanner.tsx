@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getPusherClient } from "@/lib/pusher-client";
 
 interface Ad {
   id: string;
   title: string;
   content: string;
+  isActive: boolean;
 }
 
 export default function AdsBanner() {
@@ -16,6 +18,22 @@ export default function AdsBanner() {
       .then((r) => r.json())
       .then((data) => Array.isArray(data) && setAds(data))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const client = getPusherClient();
+    const ch = client.subscribe("advertisements");
+    ch.bind("ad-deleted", ({ id }: { id: string }) => {
+      setAds((prev) => prev.filter((a) => a.id !== id));
+    });
+    ch.bind("ad-updated", (updated: Ad) => {
+      if (!updated.isActive) {
+        setAds((prev) => prev.filter((a) => a.id !== updated.id));
+      } else {
+        setAds((prev) => prev.map((a) => a.id === updated.id ? updated : a));
+      }
+    });
+    return () => { ch.unbind_all(); };
   }, []);
 
   if (ads.length === 0) return null;
