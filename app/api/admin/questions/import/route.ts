@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { questions, examQuestions } from "@/lib/schema";
+import { questions, examQuestions, exams } from "@/lib/schema";
 import { revalidatePath } from "next/cache";
 import { canUploadQuestions } from "@/lib/rbac";
 
@@ -40,6 +40,10 @@ export async function POST(req: NextRequest) {
 
   const allIds = await db.select({ id: questions.id }).from(questions);
   let nextId = allIds.length > 0 ? Math.max(...allIds.map((q) => q.id)) + 1 : 1;
+
+  // Pre-fetch valid exam IDs to prevent FK violations on exam_questions inserts
+  const allExamRows = await db.select({ id: exams.id }).from(exams);
+  const validExamIds = new Set(allExamRows.map((e) => e.id));
 
   let imported = 0;
   let updated = 0;
@@ -81,9 +85,10 @@ export async function POST(req: NextRequest) {
 
         const result = await upsertQuestion({
           idStr, text, type, options, correctRaw, points: parseInt(pointsStr),
-          explanation, examIds, lineNum, allIds, nextId,
+          explanation, examIds, lineNum, allIds, nextId, validExamIds,
         });
         if (result.error) { errors.push(result.error); continue; }
+        if (result.warning) { errors.push(result.warning); }
         if (result.wasNew) { imported++; if (result.id === nextId) { nextId++; allIds.push({ id: result.id }); } }
         else { updated++; }
 
@@ -100,9 +105,10 @@ export async function POST(req: NextRequest) {
 
         const result = await upsertQuestion({
           idStr, text, type, options, correctRaw, points: parseInt(pointsStr),
-          explanation, examIds, lineNum, allIds, nextId,
+          explanation, examIds, lineNum, allIds, nextId, validExamIds,
         });
         if (result.error) { errors.push(result.error); continue; }
+        if (result.warning) { errors.push(result.warning); }
         if (result.wasNew) { imported++; if (result.id === nextId) { nextId++; allIds.push({ id: result.id }); } }
         else { updated++; }
       }
@@ -120,8 +126,9 @@ async function upsertQuestion(p: {
   options: string[]; correctRaw: string; points: number;
   explanation: string | null; examIds: string[];
   lineNum: number; allIds: { id: number }[]; nextId: number;
-}): Promise<{ error?: string; wasNew?: boolean; id?: number }> {
-  const { idStr, text, type, options, correctRaw, points, explanation, examIds, lineNum, allIds, nextId } = p;
+  validExamIds: Set<string>;
+}): Promise<{ error?: string; warning?: string; wasNew?: boolean; id?: number }> {
+  const { idStr, text, type, options, correctRaw, points, explanation, examIds, lineNum, allIds, nextId, validExamIds } = p;
 
   if (!text.trim()) return { error: `Sətir ${lineNum}: sual mətni boşdur` };
   if (!["single", "multiple"].includes(type)) return { error: `Sətir ${lineNum}: type "single" və ya "multiple" olmalıdır` };
@@ -153,11 +160,18 @@ async function upsertQuestion(p: {
   await db.insert(questions).values({ id, ...values })
     .onConflictDoUpdate({ target: questions.id, set: values });
 
-  for (const examId of examIds) {
+  const invalidExamIds = examIds.filter((eid) => !validExamIds.has(eid));
+  const validIds = examIds.filter((eid) => validExamIds.has(eid));
+
+  for (const examId of validIds) {
     await db.insert(examQuestions).values({ examId, questionId: id }).onConflictDoNothing();
   }
 
-  return { wasNew: !wasExisting, id };
+  const warning = invalidExamIds.length > 0
+    ? `Sətir ${lineNum}: sual əlavə edildi, lakin aşağıdakı exam_id-lər tapılmadı (keçirildi): ${invalidExamIds.join(", ")}`
+    : undefined;
+
+  return { wasNew: !wasExisting, id, warning };
 }
 
 function parseCsvLine(line: string): string[] {
