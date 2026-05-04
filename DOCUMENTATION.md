@@ -1,12 +1,17 @@
-# QA Exam Portal — Tam Sənədləşmə (v10 — Exam Multi-Select in Add/Edit Modals)
+# QA Exam Portal — Tam Sənədləşmə (v11 — Bulk Exam Assignment, Dropdown Multi-Select, CSV Simplification)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
 > **Repo:** GitHub — Ehtimad/qa-exam-portal  
-> **Son versiya:** v10 — Sual Add/Edit modallarında exam çox seçimi, CSV `exam_ids` (çoxlu), ayrıca exam modalı silindi
+> **Son versiya:** v11 — Toplu sual seçimi + exam assignment, dropdown multi-select, CSV sadələşdirildi (lecture_id/difficulty silindi)
 
 ---
 
 ## Changelog
+
+### v11 (2026-05-04)
+- **Bulk select + exam assignment:** Suallar cədvəlində checkbox sütunu əlavə edildi. Toplu seçim sonrası "İmtahana Əlavə Et" dropdown panel açılır, multi-select ilə bir neçə imtahan seçilir. `POST /api/admin/questions/bulk-exam` endpoint yaradıldı (additive, mövcud əlaqələri silmir).
+- **Exam dropdown (Add/Edit modal):** İmtahan seçimi daha əvvəlki scrollable checkbox listdən `İmtahan seç...` dropdown + seçilmiş imtahanlar tag (chip) görünüşünə dəyişdirildi.
+- **CSV format sadələşdirildi:** `lecture_id` və `difficulty` sütunları şablondan silindi. Yeni format: `id,text,type,option_1..option_6,correct_answers,points,explanation,exam_ids`. Import köhnə formatı da tanıyır (backwards-compat).
 
 ### v10 (2026-05-04)
 - **Exam multi-select in Add/Edit modals:** Sual əlavə etmə və redaktə modallarına "İmtahanlar" çox seçimli bölmə əlavə edildi. Sual saxlanıldıqda exam əlaqələri avtomatik yenilənir (`PUT /api/admin/questions/[id]/exams`). Ayrıca "İmtahan Əlavə Et" modal aradan qaldırıldı.

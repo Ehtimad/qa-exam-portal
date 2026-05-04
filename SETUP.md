@@ -1,4 +1,4 @@
-# QA Online Exam Portal — Quraşdırma Təlimatı (v10)
+# QA Online Exam Portal — Quraşdırma Təlimatı (v11)
 
 ## Texniki Stack
 

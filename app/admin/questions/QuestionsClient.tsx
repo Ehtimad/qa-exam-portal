@@ -31,6 +31,67 @@ const EMPTY_FORM: FormState = {
   options: ["", "", "", ""], correctAnswers: [], imageUrl: "", explanation: "",
 };
 
+// Inline dropdown multi-select (no absolute positioning — expands in-flow to avoid z-index issues inside modals)
+function ExamMultiSelect({ options, onChange, loading }: {
+  options: ExamOption[];
+  onChange: (updated: ExamOption[]) => void;
+  loading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.filter((e) => e.assigned);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => !loading && setOpen((o) => !o)}
+        disabled={loading}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm flex items-center justify-between hover:border-blue-400 transition-colors focus:outline-none"
+      >
+        <span className={loading ? "text-gray-400" : selected.length ? "text-gray-700" : "text-gray-400"}>
+          {loading ? "Yüklənir..." : selected.length ? `${selected.length} imtahan seçildi` : "İmtahan seç..."}
+        </span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="w-full mt-1 border border-gray-200 rounded-lg bg-white shadow-sm max-h-44 overflow-y-auto">
+          {options.length === 0 ? (
+            <p className="text-sm text-gray-400 px-3 py-3 text-center">İmtahan tapılmadı. Əvvəlcə imtahan yaradın.</p>
+          ) : (
+            options.map((e) => (
+              <label key={e.id}
+                className="flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0">
+                <input type="checkbox" checked={e.assigned}
+                  onChange={(ev) => onChange(options.map((x) => x.id === e.id ? { ...x, assigned: ev.target.checked } : x))}
+                  className="w-4 h-4 accent-blue-600 flex-shrink-0" />
+                <span className="text-sm text-gray-800">{e.name}</span>
+              </label>
+            ))
+          )}
+        </div>
+      )}
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {selected.map((e) => (
+            <span key={e.id}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+              {e.name}
+              <button type="button"
+                onClick={() => onChange(options.map((x) => x.id === e.id ? { ...x, assigned: false } : x))}
+                className="hover:text-blue-900 ml-0.5 font-bold leading-none">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function QuestionsClient({ initialQuestions }: { initialQuestions: Question[] }) {
   const router = useRouter();
   const [questions, setQuestions] = useState(initialQuestions);
@@ -47,6 +108,13 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   const [formExamOptions, setFormExamOptions] = useState<ExamOption[]>([]);
   const [formExamLoading, setFormExamLoading] = useState(false);
 
+  // Bulk row selection
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkExamOptions, setBulkExamOptions] = useState<ExamOption[]>([]);
+  const [bulkExamOpen, setBulkExamOpen] = useState(false);
+  const [bulkExamLoading, setBulkExamLoading] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+
   // Pagination
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,6 +124,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   );
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const allPageSelected = paginated.length > 0 && paginated.every((q) => selectedIds.has(q.id));
 
   async function loadExamsForQuestion(qId: number) {
     setFormExamOptions([]);
@@ -79,7 +148,17 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     setFormExamLoading(false);
   }
 
-  async function openEdit(q: Question) {
+  async function loadBulkExams() {
+    setBulkExamLoading(true);
+    const res = await fetch("/api/admin/exams");
+    if (res.ok) {
+      const data = await res.json() as { id: string; title: string }[];
+      setBulkExamOptions(data.map((e) => ({ id: e.id, name: e.title, assigned: false })));
+    }
+    setBulkExamLoading(false);
+  }
+
+  function openEdit(q: Question) {
     setEditQ(q);
     setShowAdd(false);
     setForm({
@@ -95,12 +174,28 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     loadExamsForQuestion(q.id);
   }
 
-  async function openAdd() {
+  function openAdd() {
     setEditQ(null);
     setShowAdd(true);
     setForm(EMPTY_FORM);
     setError("");
     loadAllExams();
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (allPageSelected) {
+      setSelectedIds((prev) => { const next = new Set(prev); paginated.forEach((q) => next.delete(q.id)); return next; });
+    } else {
+      setSelectedIds((prev) => { const next = new Set(prev); paginated.forEach((q) => next.add(q.id)); return next; });
+    }
   }
 
   function toggleCorrect(idx: number) {
@@ -134,14 +229,12 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
 
     if (res.ok) {
       const updated = await res.json();
-      // Save exam assignments
       const examIds = formExamOptions.filter((e) => e.assigned).map((e) => e.id);
       await fetch(`/api/admin/questions/${updated.id}/exams`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ examIds }),
       });
-
       if (editQ) {
         setQuestions((prev) => prev.map((q) => q.id === updated.id ? updated : q));
       } else {
@@ -160,6 +253,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     if (!confirm("Bu sualı silmək istədiyinizə əminsiniz?")) return;
     await fetch(`/api/admin/questions/${id}`, { method: "DELETE" });
     setQuestions((prev) => prev.filter((q) => q.id !== id));
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -182,10 +276,26 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  async function saveBulkExam() {
+    const examIds = bulkExamOptions.filter((e) => e.assigned).map((e) => e.id);
+    if (!examIds.length) return;
+    setBulkSaving(true);
+    await fetch("/api/admin/questions/bulk-exam", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionIds: Array.from(selectedIds), examIds }),
+    });
+    setBulkSaving(false);
+    setBulkExamOpen(false);
+    setBulkExamOptions([]);
+    setSelectedIds(new Set());
+  }
+
   const showForm = showAdd || editQ !== null;
 
   return (
     <>
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sual Bazası</h1>
@@ -201,8 +311,10 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
         </div>
       </div>
 
+      {/* Search + per-page */}
       <div className="flex items-center gap-3 mb-4">
-        <input type="text" placeholder="Sual axtar..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+        <input type="text" placeholder="Sual axtar..." value={search}
+          onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); setSelectedIds(new Set()); }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 max-w-sm" />
         <span className="text-sm text-gray-500">{filtered.length} nəticə</span>
         <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
@@ -211,11 +323,87 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
         </select>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
+          <span className="text-sm font-semibold text-blue-800">{selectedIds.size} sual seçildi</span>
+          <div className="relative">
+            {bulkExamOpen && (
+              <div className="fixed inset-0 z-10" onClick={() => setBulkExamOpen(false)} />
+            )}
+            <button
+              onClick={() => {
+                const opening = !bulkExamOpen;
+                setBulkExamOpen(opening);
+                if (opening) loadBulkExams();
+              }}
+              className="btn-primary text-sm py-1.5 px-3 flex items-center gap-1.5 relative z-20"
+            >
+              İmtahana Əlavə Et
+              <svg className={`w-3.5 h-3.5 transition-transform ${bulkExamOpen ? "rotate-180" : ""}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {bulkExamOpen && (
+              <div className="absolute left-0 top-full mt-1 z-20 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-3">
+                <p className="text-xs font-semibold text-gray-600 mb-2">İmtahan(lar) seçin:</p>
+                {bulkExamLoading ? (
+                  <p className="text-sm text-gray-400 py-3 text-center">Yüklənir...</p>
+                ) : bulkExamOptions.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-3 text-center">İmtahan tapılmadı</p>
+                ) : (
+                  <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
+                    {bulkExamOptions.map((e) => (
+                      <label key={e.id} className="flex items-center gap-2.5 px-2 py-2 hover:bg-blue-50 cursor-pointer rounded-lg">
+                        <input type="checkbox" checked={e.assigned}
+                          onChange={(ev) => setBulkExamOptions((prev) =>
+                            prev.map((x) => x.id === e.id ? { ...x, assigned: ev.target.checked } : x)
+                          )}
+                          className="w-4 h-4 accent-blue-600" />
+                        <span className="text-sm text-gray-800">{e.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {bulkExamOptions.some((e) => e.assigned) && (
+                  <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-100">
+                    {bulkExamOptions.filter((e) => e.assigned).map((e) => (
+                      <span key={e.id} className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                        {e.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100">
+                  <button onClick={saveBulkExam}
+                    disabled={bulkSaving || !bulkExamOptions.some((e) => e.assigned)}
+                    className="btn-primary text-xs flex-1 py-1.5 disabled:opacity-50">
+                    {bulkSaving ? "Saxlanılır..." : "Saxla"}
+                  </button>
+                  <button onClick={() => { setBulkExamOpen(false); setBulkExamOptions([]); }}
+                    className="btn-secondary text-xs flex-1 py-1.5">Ləğv et</button>
+                </div>
+              </div>
+            )}
+          </div>
+          <button onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-sm text-blue-600 hover:text-blue-800 font-medium">
+            Seçimi sıfırla
+          </button>
+        </div>
+      )}
+
+      {/* Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="px-3 py-3 w-10">
+                  <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAll}
+                    className="w-4 h-4 accent-blue-600" />
+                </th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium w-12">#</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Sual</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Tip</th>
@@ -225,7 +413,12 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
             </thead>
             <tbody>
               {paginated.map((q) => (
-                <tr key={q.id} className="border-b border-gray-50 hover:bg-gray-50">
+                <tr key={q.id}
+                  className={`border-b border-gray-50 hover:bg-gray-50 ${selectedIds.has(q.id) ? "bg-blue-50" : ""}`}>
+                  <td className="px-3 py-3">
+                    <input type="checkbox" checked={selectedIds.has(q.id)} onChange={() => toggleSelect(q.id)}
+                      className="w-4 h-4 accent-blue-600" />
+                  </td>
                   <td className="px-3 py-3 text-gray-400">{q.id}</td>
                   <td className="px-3 py-3 text-gray-900 max-w-xs truncate">{q.text}</td>
                   <td className="px-3 py-3">
@@ -236,8 +429,10 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                   <td className="px-3 py-3 text-gray-600">{q.points}</td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => openEdit(q)} className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">Redaktə</button>
-                      <button onClick={() => handleDelete(q.id)} className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50">Sil</button>
+                      <button onClick={() => openEdit(q)}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">Redaktə</button>
+                      <button onClick={() => handleDelete(q.id)}
+                        className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50">Sil</button>
                     </div>
                   </td>
                 </tr>
@@ -285,7 +480,8 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tip</label>
-                  <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as "single" | "multiple", correctAnswers: [] })}
+                  <select value={form.type}
+                    onChange={(e) => setForm({ ...form, type: e.target.value as "single" | "multiple", correctAnswers: [] })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                     <option value="single">Tək cavab</option>
                     <option value="multiple">Çoxlu cavab</option>
@@ -293,7 +489,8 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bal</label>
-                  <input type="number" min={1} value={form.points} onChange={(e) => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
+                  <input type="number" min={1} value={form.points}
+                    onChange={(e) => setForm({ ...form, points: parseInt(e.target.value) || 1 })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
               </div>
@@ -350,27 +547,11 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   İmtahanlar <span className="text-gray-400 font-normal">(bu sualın daxil olacağı imtahanları seçin)</span>
                 </label>
-                {formExamLoading ? (
-                  <p className="text-sm text-gray-400 py-2">Yüklənir...</p>
-                ) : formExamOptions.length === 0 ? (
-                  <p className="text-sm text-gray-400 py-2">İmtahan tapılmadı. Əvvəlcə imtahan yaradın.</p>
-                ) : (
-                  <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-44 overflow-y-auto">
-                    {formExamOptions.map((e) => (
-                      <label key={e.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={e.assigned}
-                          onChange={(ev) => setFormExamOptions((prev) =>
-                            prev.map((x) => x.id === e.id ? { ...x, assigned: ev.target.checked } : x)
-                          )}
-                          className="w-4 h-4 rounded accent-blue-600"
-                        />
-                        <span className="text-sm text-gray-800">{e.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
+                <ExamMultiSelect
+                  options={formExamOptions}
+                  onChange={setFormExamOptions}
+                  loading={formExamLoading}
+                />
               </div>
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
