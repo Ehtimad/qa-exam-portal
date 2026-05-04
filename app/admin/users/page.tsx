@@ -9,6 +9,7 @@ import UsersFilterBar from "./UsersFilterBar";
 import { canViewStudents, canManageUsers } from "@/lib/rbac";
 import CreateUserButton from "./CreateUserButton";
 import PerPageSelect from "@/components/PerPageSelect";
+import { initDatabase } from "@/lib/init-db";
 
 type DBUser = typeof users.$inferSelect;
 type Group = typeof groups.$inferSelect;
@@ -31,6 +32,9 @@ export default async function AdminUsersPage({
   let allUsers: DBUser[] = [];
   let allGroups: Group[] = [];
   let dbError = false;
+
+  // Ensure teacher_id column exists before querying it
+  await initDatabase().catch(() => {});
 
   try {
     if (isTeacher) {

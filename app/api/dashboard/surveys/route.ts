@@ -3,8 +3,10 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { teacherForms, teacherFormAnswers, users } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
+import { initDatabase } from "@/lib/init-db";
 
 export async function GET() {
+  await initDatabase();
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

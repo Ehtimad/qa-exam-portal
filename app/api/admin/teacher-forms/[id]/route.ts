@@ -4,8 +4,10 @@ import { db } from "@/lib/db";
 import { teacherForms, teacherFormAnswers, users } from "@/lib/schema";
 import { eq, and } from "drizzle-orm";
 import { canManageForms } from "@/lib/rbac";
+import { initDatabase } from "@/lib/init-db";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await initDatabase();
   const session = await auth();
   if (!session || !canManageForms(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

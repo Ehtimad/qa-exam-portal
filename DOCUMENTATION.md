@@ -1,12 +1,22 @@
-# QA Exam Portal — Tam Sənədləşmə (v11 — Bulk Exam Assignment, Dropdown Multi-Select, CSV Simplification)
+# QA Exam Portal — Tam Sənədləşmə (v12 — Teacher Ecosystem, Feedback & Survey Module)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
 > **Repo:** GitHub — Ehtimad/qa-exam-portal  
-> **Son versiya:** v11 — Toplu sual seçimi + exam assignment, dropdown multi-select, CSV sadələşdirildi (lecture_id/difficulty silindi)
+> **Son versiya:** v12 — Müəllim ekosistemi, rəy sistemi, sorğu modulu
 
 ---
 
 ## Changelog
+
+### v12 (2026-05-04)
+- **Multi-tenancy:** `teacher_id` sütunu `users` cədvəlinə əlavə edildi. Hər tələbə bir müəllimə bağlıdır.
+- **Qeydiyyat:** Tələbə qeydiyyatı zamanı müəllim seçimi əlavə edildi (məcburi). `/api/teachers` endpoint yaradıldı.
+- **Approve mexanizmi:** Həm admin, həm də teacher öz tələbəsinin hesabını aktiv edə bilir. `PATCH /api/admin/users` teacher rolunu dəstəkləyir.
+- **Müəllim paneli:** Teacher rollu istifadəçi `/admin/users`-da yalnız öz `teacher_id`-si ilə bağlı tələbələri görür.
+- **Rəy sistemi:** `feedbacks` cədvəli, `POST/GET /api/admin/feedbacks`. `/admin/feedback` (müəllim/admin üçün). `/dashboard/feedback` (tələbə üçün — rəy ver / gələnlər / göndərilənlər 3 tab).
+- **Sorğu modulu:** `teacher_forms` + `teacher_form_answers` cədvəlləri. `/admin/teacher-forms` (müəllim sorğu yaradır, cavabları görür). `/dashboard/surveys` (tələbə cavablayır). Açıq cavab / tək seçim / çoxlu seçim növləri.
+- **Naviqasiya:** Admin nav-da Rəylər + Sorğular linkləri əlavə edildi. Dashboard nav-da Sorğular + Rəylər linkləri əlavə edildi.
+- **DB migration fix:** `initialized = true` artıq migration bitdikdən sonra set olunur. Yeni API routelar `initDatabase()` çağırır. Self-ref FK constraint kənarlaşdırıldı (app-level validation ilə əvəz edildi).
 
 ### v11 (2026-05-04)
 - **Bulk select + exam assignment:** Suallar cədvəlində checkbox sütunu əlavə edildi. Toplu seçim sonrası "İmtahana Əlavə Et" dropdown panel açılır, multi-select ilə bir neçə imtahan seçilir. `POST /api/admin/questions/bulk-exam` endpoint yaradıldı (additive, mövcud əlaqələri silmir).

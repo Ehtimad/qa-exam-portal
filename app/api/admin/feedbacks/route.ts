@@ -4,8 +4,10 @@ import { db } from "@/lib/db";
 import { feedbacks, users } from "@/lib/schema";
 import { eq, desc, and, or } from "drizzle-orm";
 import { canGiveFeedback } from "@/lib/rbac";
+import { initDatabase } from "@/lib/init-db";
 
 export async function GET(req: NextRequest) {
+  await initDatabase();
   const session = await auth();
   if (!session || !canGiveFeedback(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -77,6 +79,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  await initDatabase();
   const session = await auth();
   if (!session || !canGiveFeedback(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -1,4 +1,4 @@
-# QA Online Exam Portal — Quraşdırma Təlimatı (v11)
+# QA Online Exam Portal — Quraşdırma Təlimatı (v12)
 
 ## Texniki Stack
 
@@ -140,16 +140,16 @@ Keçid balı: **70%** (350 bal)
 
 | Rol | Giriş |
 |-----|-------|
-| `student` | Dashboard, Exam, Materials, Messages |
+| `student` | Dashboard, Exam, Materials, Sorğular, Rəylər, Messages |
 | `admin` | Hər yer (tam giriş) |
 | `manager` | Admin (geniş) |
 | `reporter` | Nəticələr, Analytics |
 | `worker` | Suallar, Import |
-| `teacher` | Materiallar, Bildirişlər, Tələbə siyahısı |
+| `teacher` | Öz tələbələri, Approve, Materiallar, Bildirişlər, Rəylər, Sorğular |
 
 ---
 
-## 8. v6 Xüsusiyyətlər
+## 8. v12 Xüsusiyyətlər
 
 | Xüsusiyyət | Açıqlama |
 |---|---|
@@ -167,6 +167,11 @@ Keçid balı: **70%** (350 bal)
 | Sertifikat (admin görünüşü) | admin nəticə səhifəsindən birbaşa yüklə |
 | Analitika yeniləndi | tələbə vs qeyri-tələbə, aktiv istifadəçi sıralaması |
 | Back/nav düymələri | bütün alt-səhifələrdə naviqasiya barları |
+| **Multi-tenancy (v12)** | `teacher_id` — hər tələbə bir müəllimə bağlıdır |
+| **Müəllim approve (v12)** | Həm admin, həm teacher öz tələbəsini activate edə bilir |
+| **Rəy sistemi (v12)** | Tələbə müəllimə, müəllim tələbəyə 1-5 ulduz + şərh |
+| **Sorğu modulu (v12)** | Müəllim sorğu yaradır (açıq/seçimli), tələbə cavablayır |
+| **Qeydiyyatda müəllim seçimi (v12)** | Tələbə qeydiyyatda öz müəllimini seçir |
 
 ---
 
@@ -180,7 +185,11 @@ Mövcud data (toxunulmayıb):
 
 Yeni sütunlar (əlavə edilib, data pozulmayıb):
 - `users.is_student`, `users.deleted_at`, `users.deletion_reason`
+- `users.teacher_id` — müəllim-tələbə əlaqəsi (v12)
 - `exams.target_type`
 
 Yeni cədvəllər (yaradılıb):
 - `materials`, `messages`, `notifications`, `advertisements`, `activity_logs`
+- `feedbacks` — rəy sistemi (v12)
+- `teacher_forms` — müəllim sorğuları (v12)
+- `teacher_form_answers` — sorğu cavabları (v12)
