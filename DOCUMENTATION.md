@@ -1,12 +1,17 @@
-# QA Exam Portal — Tam Sənədləşmə (v9 — Pagination, Impersonation Fix, Exam Modal Fix)
+# QA Exam Portal — Tam Sənədləşmə (v10 — Exam Multi-Select in Add/Edit Modals)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
 > **Repo:** GitHub — Ehtimad/qa-exam-portal  
-> **Son versiya:** v9 — Pagination (suallar/istifadəçilər/nəticələr/fəaliyyət), impersonation middleware düzəltməsi, exam modal loading fix
+> **Son versiya:** v10 — Sual Add/Edit modallarında exam çox seçimi, CSV `exam_ids` (çoxlu), ayrıca exam modalı silindi
 
 ---
 
 ## Changelog
+
+### v10 (2026-05-04)
+- **Exam multi-select in Add/Edit modals:** Sual əlavə etmə və redaktə modallarına "İmtahanlar" çox seçimli bölmə əlavə edildi. Sual saxlanıldıqda exam əlaqələri avtomatik yenilənir (`PUT /api/admin/questions/[id]/exams`). Ayrıca "İmtahan Əlavə Et" modal aradan qaldırıldı.
+- **CSV template:** `exam_id` sütunu `exam_ids`-ə dəyişdirildi. Bir neçə imtahan UUID-si nöqtəli vergüllə ayrıla bilər (`uuid-1;uuid-2`).
+- **CSV import:** Çoxlu imtahan ID dəstəyi — hər biri `examQuestions` cədvəlinə əlavə edilir.
 
 ### v9 (2026-05-01)
 - **Pagination:** Suallar, istifadəçilər, nəticələr, fəaliyyət jurnalı səhifələrindəm hər səhifədə 10/25/50/100 sətir seçimi əlavə edildi. URL parametrləri: `page`, `perPage`. `PerPageSelect` paylaşılan client komponenti yaradıldı.

@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       const difficulty = rest[7] ?? "medium";
       const pointsStr = rest[8] ?? "5";
       const explanation = rest[9] ?? null;
-      const examId = rest[10]?.trim() || null;
+      const examIds = rest[10]?.trim() ? rest[10].trim().split(";").map((s) => s.trim()).filter(Boolean) : [];
 
       const lectureId = parseInt(lectureIdStr);
       const points = parseInt(pointsStr);
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       if (wasExisting) { updated++; }
       else { imported++; if (id === nextId) nextId++; allIds.push({ id }); }
 
-      if (examId) {
+      for (const examId of examIds) {
         await db.insert(examQuestions)
           .values({ examId, questionId: id })
           .onConflictDoNothing();

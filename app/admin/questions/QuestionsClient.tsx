@@ -43,11 +43,9 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Exam assignment modal state
-  const [examModalQ, setExamModalQ] = useState<Question | null>(null);
-  const [examOptions, setExamOptions] = useState<ExamOption[]>([]);
-  const [examSaving, setExamSaving] = useState(false);
-  const [examLoading, setExamLoading] = useState(false);
+  // Exam multi-select inside Add/Edit modal
+  const [formExamOptions, setFormExamOptions] = useState<ExamOption[]>([]);
+  const [formExamLoading, setFormExamLoading] = useState(false);
 
   // Pagination
   const [pageSize, setPageSize] = useState(25);
@@ -59,8 +57,31 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  function openEdit(q: Question) {
+  async function loadExamsForQuestion(qId: number) {
+    setFormExamOptions([]);
+    setFormExamLoading(true);
+    const res = await fetch(`/api/admin/questions/${qId}/exams`);
+    if (res.ok) {
+      const data = await res.json() as { id: string; title: string; assigned: boolean }[];
+      setFormExamOptions(data.map((e) => ({ id: e.id, name: e.title, assigned: e.assigned })));
+    }
+    setFormExamLoading(false);
+  }
+
+  async function loadAllExams() {
+    setFormExamOptions([]);
+    setFormExamLoading(true);
+    const res = await fetch("/api/admin/exams");
+    if (res.ok) {
+      const data = await res.json() as { id: string; title: string }[];
+      setFormExamOptions(data.map((e) => ({ id: e.id, name: e.title, assigned: false })));
+    }
+    setFormExamLoading(false);
+  }
+
+  async function openEdit(q: Question) {
     setEditQ(q);
+    setShowAdd(false);
     setForm({
       text: q.text,
       type: q.type as "single" | "multiple",
@@ -71,13 +92,15 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
       explanation: q.explanation ?? "",
     });
     setError("");
+    loadExamsForQuestion(q.id);
   }
 
-  function openAdd() {
+  async function openAdd() {
     setEditQ(null);
-    setForm(EMPTY_FORM);
     setShowAdd(true);
+    setForm(EMPTY_FORM);
     setError("");
+    loadAllExams();
   }
 
   function toggleCorrect(idx: number) {
@@ -96,7 +119,6 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
 
     setSaving(true);
     setError("");
-    // Send required API fields with defaults for hidden fields
     const payload = {
       ...form,
       options: opts,
@@ -108,12 +130,18 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
 
     const url = editQ ? `/api/admin/questions/${editQ.id}` : "/api/admin/questions";
     const method = editQ ? "PUT" : "POST";
-
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    setSaving(false);
 
     if (res.ok) {
       const updated = await res.json();
+      // Save exam assignments
+      const examIds = formExamOptions.filter((e) => e.assigned).map((e) => e.id);
+      await fetch(`/api/admin/questions/${updated.id}/exams`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ examIds }),
+      });
+
       if (editQ) {
         setQuestions((prev) => prev.map((q) => q.id === updated.id ? updated : q));
       } else {
@@ -125,6 +153,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
       const d = await res.json();
       setError(d.error ?? "Xəta baş verdi");
     }
+    setSaving(false);
   }
 
   async function handleDelete(id: number) {
@@ -151,28 +180,6 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
       alert("İdxal xətası");
     }
     if (fileRef.current) fileRef.current.value = "";
-  }
-
-  async function openExamModal(q: Question) {
-    setExamModalQ(q);
-    setExamOptions([]);
-    setExamLoading(true);
-    const res = await fetch(`/api/admin/questions/${q.id}/exams`);
-    if (res.ok) setExamOptions(await res.json());
-    setExamLoading(false);
-  }
-
-  async function saveExamAssignments() {
-    if (!examModalQ) return;
-    setExamSaving(true);
-    const examIds: string[] = examOptions.filter((e) => e.assigned).map((e) => e.id);
-    await fetch(`/api/admin/questions/${examModalQ.id}/exams`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ examIds }),
-    });
-    setExamSaving(false);
-    setExamModalQ(null);
   }
 
   const showForm = showAdd || editQ !== null;
@@ -213,7 +220,6 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Sual</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Tip</th>
                 <th className="text-left px-3 py-3 text-gray-500 font-medium">Bal</th>
-                <th className="text-left px-3 py-3 text-gray-500 font-medium">İmtahanlar</th>
                 <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
               </tr>
             </thead>
@@ -228,12 +234,6 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                     </span>
                   </td>
                   <td className="px-3 py-3 text-gray-600">{q.points}</td>
-                  <td className="px-3 py-3">
-                    <button onClick={() => openExamModal(q)}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded hover:bg-indigo-50 border border-indigo-200">
-                      İmtahan Əlavə Et
-                    </button>
-                  </td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => openEdit(q)} className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">Redaktə</button>
@@ -275,8 +275,8 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
 
       {/* Add/Edit Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 my-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 my-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-5">
               {editQ ? `Sual #${editQ.id} redaktə et` : "Yeni sual əlavə et"}
             </h2>
@@ -345,6 +345,34 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 )}
               </div>
 
+              {/* Exam multi-select */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  İmtahanlar <span className="text-gray-400 font-normal">(bu sualın daxil olacağı imtahanları seçin)</span>
+                </label>
+                {formExamLoading ? (
+                  <p className="text-sm text-gray-400 py-2">Yüklənir...</p>
+                ) : formExamOptions.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2">İmtahan tapılmadı. Əvvəlcə imtahan yaradın.</p>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-44 overflow-y-auto">
+                    {formExamOptions.map((e) => (
+                      <label key={e.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={e.assigned}
+                          onChange={(ev) => setFormExamOptions((prev) =>
+                            prev.map((x) => x.id === e.id ? { ...x, assigned: ev.target.checked } : x)
+                          )}
+                          className="w-4 h-4 rounded accent-blue-600"
+                        />
+                        <span className="text-sm text-gray-800">{e.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {error && <p className="text-red-600 text-sm">{error}</p>}
             </div>
 
@@ -353,43 +381,6 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                 {saving ? "Saxlanılır..." : "Saxla"}
               </button>
               <button onClick={() => { setEditQ(null); setShowAdd(false); }} className="btn-secondary flex-1">Ləğv et</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Exam assignment modal */}
-      {examModalQ && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">İmtahana Əlavə Et</h2>
-            <p className="text-xs text-gray-500 mb-4 truncate">Sual #{examModalQ.id}: {examModalQ.text.slice(0, 50)}...</p>
-
-            {examLoading ? (
-              <p className="text-gray-400 text-sm py-4 text-center">Yüklənir...</p>
-            ) : examOptions.length === 0 ? (
-              <p className="text-gray-400 text-sm py-4 text-center">İmtahan tapılmadı. Əvvəlcə imtahan yaradın.</p>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {examOptions.map((e) => (
-                  <label key={e.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" checked={e.assigned}
-                      onChange={(ev) => setExamOptions((prev) =>
-                        prev.map((x) => x.id === e.id ? { ...x, assigned: ev.target.checked } : x)
-                      )}
-                      className="w-4 h-4 rounded accent-blue-600" />
-                    <span className="text-sm text-gray-800">{e.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-3 mt-5">
-              <button onClick={saveExamAssignments} disabled={examSaving || examLoading || examOptions.length === 0}
-                className="btn-primary flex-1">
-                {examSaving ? "Saxlanılır..." : "Saxla"}
-              </button>
-              <button onClick={() => setExamModalQ(null)} className="btn-secondary flex-1">Ləğv et</button>
             </div>
           </div>
         </div>
