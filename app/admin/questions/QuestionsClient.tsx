@@ -47,10 +47,17 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   const [examModalQ, setExamModalQ] = useState<Question | null>(null);
   const [examOptions, setExamOptions] = useState<ExamOption[]>([]);
   const [examSaving, setExamSaving] = useState(false);
+  const [examLoading, setExamLoading] = useState(false);
+
+  // Pagination
+  const [pageSize, setPageSize] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filtered = questions.filter((q) =>
     !search || q.text.toLowerCase().includes(search.toLowerCase())
   );
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   function openEdit(q: Question) {
     setEditQ(q);
@@ -149,8 +156,10 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   async function openExamModal(q: Question) {
     setExamModalQ(q);
     setExamOptions([]);
+    setExamLoading(true);
     const res = await fetch(`/api/admin/questions/${q.id}/exams`);
     if (res.ok) setExamOptions(await res.json());
+    setExamLoading(false);
   }
 
   async function saveExamAssignments() {
@@ -185,9 +194,14 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
         </div>
       </div>
 
-      <div className="flex gap-3 mb-4">
-        <input type="text" placeholder="Sual axtar..." value={search} onChange={(e) => setSearch(e.target.value)}
+      <div className="flex items-center gap-3 mb-4">
+        <input type="text" placeholder="Sual axtar..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 max-w-sm" />
+        <span className="text-sm text-gray-500">{filtered.length} nəticə</span>
+        <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+          className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none">
+          {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n} / səhifə</option>)}
+        </select>
       </div>
 
       <div className="card overflow-hidden">
@@ -204,7 +218,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
               </tr>
             </thead>
             <tbody>
-              {filtered.map((q) => (
+              {paginated.map((q) => (
                 <tr key={q.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-3 py-3 text-gray-400">{q.id}</td>
                   <td className="px-3 py-3 text-gray-900 max-w-xs truncate">{q.text}</td>
@@ -232,6 +246,29 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
           </table>
           {filtered.length === 0 && (
             <p className="text-center text-gray-400 text-sm py-8">Nəticə tapılmadı</p>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-3 py-3 border-t border-gray-100">
+              <span className="text-xs text-gray-500">
+                {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} / {filtered.length}
+              </span>
+              <div className="flex gap-1">
+                <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
+                  className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">← Əvvəl</button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+                  const p = start + i;
+                  return p <= totalPages ? (
+                    <button key={p} onClick={() => setCurrentPage(p)}
+                      className={`px-2.5 py-1 text-xs rounded border ${p === currentPage ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 hover:bg-gray-50"}`}>
+                      {p}
+                    </button>
+                  ) : null;
+                })}
+                <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                  className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Sonra →</button>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -328,8 +365,10 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
             <h2 className="text-lg font-semibold text-gray-900 mb-1">İmtahana Əlavə Et</h2>
             <p className="text-xs text-gray-500 mb-4 truncate">Sual #{examModalQ.id}: {examModalQ.text.slice(0, 50)}...</p>
 
-            {examOptions.length === 0 ? (
+            {examLoading ? (
               <p className="text-gray-400 text-sm py-4 text-center">Yüklənir...</p>
+            ) : examOptions.length === 0 ? (
+              <p className="text-gray-400 text-sm py-4 text-center">İmtahan tapılmadı. Əvvəlcə imtahan yaradın.</p>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {examOptions.map((e) => (
@@ -346,7 +385,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
             )}
 
             <div className="flex gap-3 mt-5">
-              <button onClick={saveExamAssignments} disabled={examSaving || examOptions.length === 0}
+              <button onClick={saveExamAssignments} disabled={examSaving || examLoading || examOptions.length === 0}
                 className="btn-primary flex-1">
                 {examSaving ? "Saxlanılır..." : "Saxla"}
               </button>

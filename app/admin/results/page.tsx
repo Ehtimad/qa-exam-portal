@@ -8,16 +8,19 @@ import { ResetButton } from "./ResetButton";
 import { Suspense } from "react";
 import ResultsFilterBar from "./ResultsFilterBar";
 import { canViewResults } from "@/lib/rbac";
+import PerPageSelect from "@/components/PerPageSelect";
 
 export default async function AdminResultsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; group?: string; result?: string }>;
+  searchParams: Promise<{ q?: string; group?: string; result?: string; page?: string; perPage?: string }>;
 }) {
   const session = await auth();
   if (!session || !canViewResults(session.user.role)) redirect("/admin");
 
-  const { q = "", group = "", result = "" } = await searchParams;
+  const { q = "", group = "", result = "", page: pageStr = "1", perPage: perPageStr = "25" } = await searchParams;
+  const page = Math.max(1, parseInt(pageStr, 10));
+  const perPage = [10, 25, 50, 100].includes(Number(perPageStr)) ? Number(perPageStr) : 25;
 
   const allResults = await db
     .select({
@@ -51,6 +54,8 @@ export default async function AdminResultsPage({
     ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
     : 0;
   const passCount = results.filter((r) => (r.score / r.maxScore) * 100 >= 70).length;
+  const totalPages = Math.ceil(results.length / perPage);
+  const paginated = results.slice((page - 1) * perPage, page * perPage);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -89,9 +94,14 @@ export default async function AdminResultsPage({
           ))}
         </div>
 
-        <Suspense>
-          <ResultsFilterBar groups={groups} />
-        </Suspense>
+        <div className="flex items-center justify-between mb-4">
+          <Suspense>
+            <ResultsFilterBar groups={groups} />
+          </Suspense>
+          <Suspense>
+            <PerPageSelect value={perPage} />
+          </Suspense>
+        </div>
 
         <div className="card">
           {results.length === 0 ? (
@@ -115,7 +125,7 @@ export default async function AdminResultsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((r) => {
+                  {paginated.map((r) => {
                     const pct = Math.round((r.score / r.maxScore) * 100);
                     const passed = pct >= 70;
                     const dur = r.duration
@@ -171,6 +181,51 @@ export default async function AdminResultsPage({
             </div>
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-1 mt-4">
+            {page > 1 && (
+              <a
+                href={`?q=${q}&group=${group}&result=${result}&page=${page - 1}&perPage=${perPage}`}
+                className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
+              >
+                ← Əvvəlki
+              </a>
+            )}
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+              .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${i}`} className="px-2 py-1.5 text-sm text-gray-400">…</span>
+                ) : (
+                  <a
+                    key={p}
+                    href={`?q=${q}&group=${group}&result=${result}&page=${p}&perPage=${perPage}`}
+                    className={`px-3 py-1.5 text-sm rounded border ${
+                      p === page
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {p}
+                  </a>
+                )
+              )}
+            {page < totalPages && (
+              <a
+                href={`?q=${q}&group=${group}&result=${result}&page=${page + 1}&perPage=${perPage}`}
+                className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
+              >
+                Növbəti →
+              </a>
+            )}
+          </div>
+        )}
       </div>
   );
 }

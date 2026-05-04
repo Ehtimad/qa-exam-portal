@@ -26,11 +26,13 @@ export const authConfig = {
       ) {
         return Response.redirect(new URL("/auth/signin", nextUrl));
       }
-      // Redirect logged-in staff directly to /admin
-      if (path === "/dashboard" && staff) {
+      // Redirect logged-in staff directly to /admin (skip if impersonating)
+      const impersonatedBy = (auth as { user?: { impersonatedBy?: string } } | null)?.user?.impersonatedBy;
+      if (path === "/dashboard" && staff && !impersonatedBy) {
         return Response.redirect(new URL("/admin", nextUrl));
       }
-      if (path.startsWith("/auth/") && isLoggedIn) {
+      // Allow /auth/impersonate even when logged in (so the new tab can sign in as target user)
+      if (path.startsWith("/auth/") && !path.startsWith("/auth/impersonate") && isLoggedIn) {
         return Response.redirect(new URL(staff ? "/admin" : "/dashboard", nextUrl));
       }
       return true;

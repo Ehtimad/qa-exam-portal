@@ -5,6 +5,8 @@ import { desc, like, and, gte, lte } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canManageUsers } from "@/lib/rbac";
+import { Suspense } from "react";
+import PerPageSelect from "@/components/PerPageSelect";
 
 export const revalidate = 0;
 
@@ -36,15 +38,16 @@ function actionColor(action: string) {
 export default async function ActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ action?: string; actor?: string; from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ action?: string; actor?: string; from?: string; to?: string; page?: string; perPage?: string }>;
 }) {
   const session = await auth();
   if (!session || !canManageUsers(session.user.role)) redirect("/admin");
 
-  const { action = "", actor = "", from = "", to = "", page: pageStr = "1" } = await searchParams;
-  const page   = Math.max(1, parseInt(pageStr, 10));
-  const limit  = 50;
-  const offset = (page - 1) * limit;
+  const { action = "", actor = "", from = "", to = "", page: pageStr = "1", perPage: perPageStr = "25" } = await searchParams;
+  const page    = Math.max(1, parseInt(pageStr, 10));
+  const perPage = [10, 25, 50, 100].includes(Number(perPageStr)) ? Number(perPageStr) : 25;
+  const limit   = perPage;
+  const offset  = (page - 1) * limit;
 
   let logs: typeof activityLogs.$inferSelect[] = [];
   let dbError = false;
@@ -102,6 +105,11 @@ export default async function ActivityPage({
         </div>
         <button type="submit" className="btn-primary text-sm">Filtrele</button>
         <Link href="/admin/activity" className="btn-secondary text-sm">Sıfırla</Link>
+        <div className="ml-auto">
+          <Suspense>
+            <PerPageSelect value={perPage} />
+          </Suspense>
+        </div>
       </form>
 
       {dbError ? (
@@ -161,14 +169,16 @@ export default async function ActivityPage({
       )}
 
       {/* Pagination */}
-      {logs.length === limit && (
+      {(page > 1 || logs.length === limit) && (
         <div className="flex justify-end mt-4 gap-2">
           {page > 1 && (
-            <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page - 1}`}
+            <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page - 1}&perPage=${perPage}`}
               className="btn-secondary text-sm">← Əvvəlki</Link>
           )}
-          <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page + 1}`}
-            className="btn-primary text-sm">Növbəti →</Link>
+          {logs.length === limit && (
+            <Link href={`/admin/activity?action=${action}&actor=${actor}&from=${from}&to=${to}&page=${page + 1}&perPage=${perPage}`}
+              className="btn-primary text-sm">Növbəti →</Link>
+          )}
         </div>
       )}
     </div>

@@ -1,12 +1,17 @@
-# QA Exam Portal — Tam Sənədləşmə (v8 — Exam Assignment, Real-time Deletion, Messages Admin)
+# QA Exam Portal — Tam Sənədləşmə (v9 — Pagination, Impersonation Fix, Exam Modal Fix)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
 > **Repo:** GitHub — Ehtimad/qa-exam-portal  
-> **Son versiya:** v8 — Sual→İmtahan məntiqi, real-time silinmə (bildirişlər/elanlar), admin mesaj idarəsi, analitika təmizləndi, paylaşılan AdminNav layout, NavBadges
+> **Son versiya:** v9 — Pagination (suallar/istifadəçilər/nəticələr/fəaliyyət), impersonation middleware düzəltməsi, exam modal loading fix
 
 ---
 
 ## Changelog
+
+### v9 (2026-05-01)
+- **Pagination:** Suallar, istifadəçilər, nəticələr, fəaliyyət jurnalı səhifələrindəm hər səhifədə 10/25/50/100 sətir seçimi əlavə edildi. URL parametrləri: `page`, `perPage`. `PerPageSelect` paylaşılan client komponenti yaradıldı.
+- **Impersonation fix:** `auth.config.ts` middleware-də `/auth/impersonate` marşrutu artıq "logged-in redirect" qaydası ilə bloklnmır. İmpersonation edilmiş staff istifadəçi `/dashboard`-a yönləndirilmir.
+- **Exam modal loading fix:** İmtahan seçimi modalı boş halda "Yüklənir..." əvəzinə "İmtahan tapılmadı. Əvvəlcə imtahan yaradın." mesajı göstərir. Yüklənmə halı `examLoading` state ilə ayrıca idarə olunur.
 
 ### v8 (2026-05-04)
 - **Sual→İmtahan məntiqi:** Suallar artıq qrupa deyil, birbaşa imtahana bağlanır. QuestionsClient-də "İmtahan Əlavə Et" modal əlavə edildi (`/api/admin/questions/[id]/exams`).
