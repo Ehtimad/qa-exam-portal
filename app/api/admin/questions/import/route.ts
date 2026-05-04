@@ -30,7 +30,11 @@ export async function POST(req: NextRequest) {
   if (!file) return NextResponse.json({ error: "Fayl tapılmadı" }, { status: 400 });
 
   const rawText = await file.text();
-  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = rawText
+    .replace(/^﻿/, "")           // strip UTF-8 BOM
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith("#")); // skip empty + comment lines
 
   if (lines.length === 0) return NextResponse.json({ error: "Fayl boşdur" }, { status: 400 });
 
