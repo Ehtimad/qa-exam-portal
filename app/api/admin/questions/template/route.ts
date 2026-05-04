@@ -11,60 +11,42 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Fetch real exam IDs from DB so the template shows usable values
+  // Fetch real exam IDs so the template shows copy-paste-ready values
   const allExams = await db
     .select({ id: exams.id, title: exams.title })
     .from(exams)
-    .orderBy(asc(exams.title))
-    .limit(5);
+    .orderBy(asc(exams.title));
 
-  const examLines = allExams.length > 0
-    ? allExams.map((e) => `#     ${e.title} → ${e.id}`).join("\n")
-    : "#     (Hələ heç bir imtahan yaradılmayıb. /admin/exams-dan imtahan yaradın)";
+  const firstExamId  = allExams[0]?.id ?? "";
+  const secondExamId = allExams[1]?.id ?? "";
 
-  const firstExamId  = allExams[0]?.id  ?? "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-  const secondExamId = allExams[1]?.id  ?? "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy";
-
-  // # lines are comment lines — skipped by the importer
-  const comments = [
-    "# ============================================================",
-    "# SUAL IMPORT ŞABLONU  —  sətirləri nümunə kimi silin",
-    "# ============================================================",
-    "#",
-    "# SÜTUNLAR:",
-    "#   id            : Boş buraxın → yeni sual avtomatik ID alır",
-    "#                   Mövcud sual ID-si yazsanız → o sual yenilənir",
-    "#   text          : Sualın mətni (məcburi)",
-    "#   type          : single  (tək cavab)  |  multiple  (çoxlu cavab)",
-    "#   option_1..6   : Cavab variantları. Minimum 2. Boş qalanlara \"\" yazın",
-    "#   correct_answers: 1-əsaslı indeks. Tək: \"2\"  Çoxlu: \"1;3\"",
-    "#   points        : Bal (tam ədəd, məs. 3 və ya 5)",
-    "#   explanation   : İzahat — imtahan bitdikdən sonra göstərilir (istəyə görə)",
-    "#   exam_ids      : İmtahan UUID-ləri (aşağıdan kopyalayın)",
-    "#                   Bir imtahan: uuid1",
-    "#                   Bir neçə   : uuid1;uuid2",
-    "#                   Boş        : heç birinə bağlanmır",
-    "#",
-    "# MOVCUd İMTAHANLAR (exam_ids üçün kopyalayın):",
-    examLines,
-    "#",
-    "# ============================================================",
-  ].join("\n");
-
+  // exam_ids hint: show available exams as the last row (clearly a reference, not data)
+  // id column: always left EMPTY — importer auto-assigns the next available ID
   const header = "id,text,type,option_1,option_2,option_3,option_4,option_5,option_6,correct_answers,points,explanation,exam_ids";
 
-  // Example 1: new question (id empty) assigned to first exam, single answer
-  const ex1 = `,"Sualın mətni burada yazın","single","Variant A","Variant B","Variant C","Variant D","","","1","5","İzahat (istəyə görə)","${firstExamId}"`;
+  // Row 1: single-answer question assigned to one exam
+  const row1 = `,"Sual mətni burada yazın","single","Variant A","Variant B","Variant C","Variant D","","","1","5","İzahat burada (istəyə görə)","${firstExamId}"`;
 
-  // Example 2: new question with multiple correct answers, two exams
-  const ex2 = `,"Çoxlu cavablı sual nümunəsi","multiple","Doğru cavab 1","Doğru cavab 2","Yanlış cavab","Yanlış cavab 2","","","1;2","5","","${firstExamId};${secondExamId}"`;
+  // Row 2: multiple-answer question assigned to two exams
+  const twoExams = firstExamId && secondExamId
+    ? `${firstExamId};${secondExamId}`
+    : firstExamId;
+  const row2 = `,"Çoxlu cavablı sual","multiple","Doğru cavab 1","Doğru cavab 2","Yanlış cavab","Yanlış cavab 2","","","1;2","5","","${twoExams}"`;
 
-  // Example 3: update existing question by ID (no exam assignment)
-  const ex3 = `"1","Mövcud sualı yeniləmək üçün sual ID-sini yazın","single","Variant A","Variant B","Variant C","Variant D","","","2","3","",""`;
+  // Row 3: question with no exam assignment
+  const row3 = `,"İmtahana bağlanmayan sual","single","Variant A","Variant B","Variant C","Variant D","","","3","3","","" `;
 
-  const csv = [comments, header, ex1, ex2, ex3, ""].join("\n");
+  // Exam reference rows — prefixed with # so the importer skips them,
+  // but they serve as a copy-paste cheat-sheet for exam UUIDs
+  const examRef = allExams.length > 0
+    ? ["# --- MOVCUd İMTAHANLAR (exam_ids sütununa kopyalayın) ---",
+       ...allExams.map((e) => `# ${e.title} = ${e.id}`),
+      ].join("\n")
+    : "# Hələ imtahan yoxdur — /admin/exams səhifəsindən imtahan yaradın";
 
-  // UTF-8 BOM ensures Excel opens the file with correct Azerbaijani characters
+  const csv = [examRef, header, row1, row2, row3, ""].join("\n");
+
+  // UTF-8 BOM — Excel-də Azərbaycan hərfləri düzgün açılır
   const bom = "﻿";
 
   return new NextResponse(bom + csv, {
