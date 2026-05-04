@@ -4,6 +4,7 @@ import {
   canManageUsers, canViewResults, canViewAnalytics,
   canManageQuestions, canManageExams, canManageGroups,
   canManageMaterials, canSendNotifications, canManageAds,
+  canGiveFeedback, canManageForms, canViewStudents,
 } from "@/lib/rbac";
 import NavBadges from "./NavBadges";
 
@@ -24,7 +25,7 @@ export default async function AdminNav({ current }: { current?: string }) {
             {role === "teacher" ? "Müəllim Paneli" : "Admin Panel"}
           </span>
           <Link href="/admin"             className={lc("dashboard")}>Dashboard</Link>
-          {canManageUsers(role)     && <Link href="/admin/users"          className={lc("users")}>İstifadəçilər</Link>}
+          {canViewStudents(role)    && <Link href="/admin/users"          className={lc("users")}>İstifadəçilər</Link>}
           {canViewResults(role)     && <Link href="/admin/results"        className={lc("results")}>Nəticələr</Link>}
           {canManageQuestions(role) && <Link href="/admin/questions"      className={lc("questions")}>Suallar</Link>}
           {canManageExams(role)     && <Link href="/admin/exams"          className={lc("exams")}>İmtahanlar</Link>}
@@ -35,6 +36,8 @@ export default async function AdminNav({ current }: { current?: string }) {
           {canManageAds(role)       && <Link href="/admin/advertisements" className={lc("ads")}>Elanlar</Link>}
           {canManageUsers(role)     && <Link href="/admin/online"         className={lc("online")}>Online</Link>}
           {canManageUsers(role)     && <Link href="/admin/activity"       className={lc("activity")}>Fəaliyyət</Link>}
+          {canGiveFeedback(role)    && <Link href="/admin/feedback"       className={lc("feedback")}>Rəylər</Link>}
+          {canManageForms(role)     && <Link href="/admin/teacher-forms"  className={lc("teacher-forms")}>Sorğular</Link>}
           <NavBadges
             userId={session.user.id}
             msgHref="/messages"

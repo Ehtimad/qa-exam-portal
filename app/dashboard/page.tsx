@@ -84,6 +84,8 @@ export default async function DashboardPage() {
           <Link href="/dashboard" className="font-semibold text-gray-900">QA Exam Portal</Link>
           <div className="flex items-center gap-3">
             <Link href="/dashboard/materials" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Materiallar</Link>
+            <Link href="/dashboard/surveys" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Sorğular</Link>
+            <Link href="/dashboard/feedback" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Rəylər</Link>
             <NavBadges userId={session.user.id} msgHref="/messages" linkClass="text-sm text-gray-600 hover:text-gray-900 font-medium" />
             <NotificationBell userId={session.user.id} />
             <span className="text-sm text-gray-500">{session.user.name}</span>

@@ -10,6 +10,7 @@ const schema = z.object({
   email:     z.string().email(),
   password:  z.string().min(6).max(100),
   groupId:   z.string().min(1),
+  teacherId: z.string().nullable().optional(),
   isStudent: z.boolean().optional().default(true),
 });
 
@@ -21,7 +22,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
   }
 
-  const { name, email, password, groupId, isStudent } = parsed.data;
+  const { name, email, password, groupId, teacherId, isStudent } = parsed.data;
+
+  if (isStudent && !teacherId) {
+    return NextResponse.json({ error: "Tələbə üçün müəllim seçimi məcburidir" }, { status: 400 });
+  }
 
   const [existing] = await db
     .select({ id: users.id })
@@ -43,6 +48,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Qrup tapılmadı" }, { status: 400 });
   }
 
+  // Validate teacher exists if provided
+  if (teacherId) {
+    const [teacher] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, teacherId))
+      .limit(1);
+    if (!teacher) {
+      return NextResponse.json({ error: "Seçilən müəllim tapılmadı" }, { status: 400 });
+    }
+  }
+
   const hashed = await bcrypt.hash(password, 12);
 
   // Students require email verification (pending approval); non-students are auto-verified
@@ -55,6 +72,7 @@ export async function POST(req: NextRequest) {
     role: "student",
     groupId: group.id,
     groupName: group.name,
+    teacherId: teacherId ?? null,
     isStudent,
     emailVerified,
   });

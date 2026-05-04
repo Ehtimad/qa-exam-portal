@@ -6,17 +6,20 @@ import { useRouter } from "next/navigation";
 import PasswordInput from "@/components/ui/PasswordInput";
 
 interface Group { id: string; name: string; }
+interface Teacher { id: string; name: string; email: string; }
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "", groupId: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "", groupId: "", teacherId: "" });
   const [isStudent, setIsStudent] = useState(true);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/groups").then((r) => r.json()).then(setGroups).catch(() => {});
+    fetch("/api/teachers").then((r) => r.json()).then(setTeachers).catch(() => {});
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -25,6 +28,7 @@ export default function RegisterPage() {
     if (form.password !== form.confirm) { setError("Şifrələr uyğun deyil"); return; }
     if (form.password.length < 6) { setError("Şifrə ən az 6 simvol olmalıdır"); return; }
     if (!form.groupId) { setError("Qrup seçin"); return; }
+    if (isStudent && !form.teacherId) { setError("Müəllim seçin"); return; }
 
     setLoading(true);
     const res = await fetch("/api/register", {
@@ -35,6 +39,7 @@ export default function RegisterPage() {
         email: form.email,
         password: form.password,
         groupId: form.groupId,
+        teacherId: form.teacherId || null,
         isStudent,
       }),
     });
@@ -64,7 +69,7 @@ export default function RegisterPage() {
               <div>
                 <p className="text-sm font-medium text-gray-800">Tələbəsən?</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {isStudent ? "Bəli — admin təsdiqi gözlənilir" : "Xeyr — dərhal daxil ola bilərsən"}
+                  {isStudent ? "Bəli — müəllim/admin təsdiqi gözlənilir" : "Xeyr — dərhal daxil ola bilərsən"}
                 </p>
               </div>
               <button
@@ -97,6 +102,24 @@ export default function RegisterPage() {
               </select>
             </div>
 
+            {isStudent && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Müəllim <span className="text-red-500">*</span>
+                </label>
+                <select value={form.teacherId} onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
+                  className="input-field" required={isStudent}>
+                  <option value="">— Müəllim seçin —</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                {teachers.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">Müəllim tapılmadı — admin ilə əlaqə saxlayın</p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">E-poçt</label>
               <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -119,7 +142,7 @@ export default function RegisterPage() {
         <div className="text-center mt-4 space-y-2">
           {isStudent && (
             <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-              Qeydiyyatdan sonra admin tərəfindən təsdiq gözlənilir
+              Qeydiyyatdan sonra müəllim və ya admin tərəfindən təsdiq gözlənilir
             </p>
           )}
           <p className="text-gray-500 text-sm">

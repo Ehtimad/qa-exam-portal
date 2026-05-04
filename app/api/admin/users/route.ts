@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { users, groups } from "@/lib/schema";
 import { eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { canManageUsers } from "@/lib/rbac";
+import { canManageUsers, canApproveStudents } from "@/lib/rbac";
 import { logActivity } from "@/lib/activity";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -23,6 +23,12 @@ const createSchema = z.object({
 async function requireAdmin() {
   const session = await auth();
   if (!session || !canManageUsers(session.user.role)) return null;
+  return session;
+}
+
+async function requireApprover() {
+  const session = await auth();
+  if (!session || !canApproveStudents(session.user.role)) return null;
   return session;
 }
 
@@ -101,14 +107,32 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await requireAdmin();
+  // Both admins and teachers can patch (verify/unverify/block/unblock)
+  const session = await requireApprover();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const isAdmin = canManageUsers(session.user.role);
+  const isTeacher = session.user.role === "teacher";
 
   const { userId, action } = await req.json();
   if (!userId || !action) return NextResponse.json({ error: "Yanlış məlumat" }, { status: 400 });
 
-  const [target] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+  const [target] = await db
+    .select({ id: users.id, email: users.email, teacherId: users.teacherId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   if (!target) return NextResponse.json({ error: "İstifadəçi tapılmadı" }, { status: 404 });
+
+  // Teachers can only act on their own students
+  if (isTeacher && target.teacherId !== session.user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Block/unblock restricted to admins
+  if (!isAdmin && (action === "block" || action === "unblock")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   switch (action) {
     case "verify":

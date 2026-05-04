@@ -77,3 +77,15 @@ export function canSendNotifications(role: string): boolean {
 export function canManageAds(role: string): boolean {
   return ["admin", "manager"].includes(role);
 }
+
+export function canApproveStudents(role: string): boolean {
+  return ["admin", "teacher"].includes(role);
+}
+
+export function canGiveFeedback(role: string): boolean {
+  return ["student", "teacher", "admin"].includes(role);
+}
+
+export function canManageForms(role: string): boolean {
+  return ["admin", "manager", "teacher"].includes(role);
+}

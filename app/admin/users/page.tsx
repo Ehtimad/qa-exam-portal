@@ -1,12 +1,12 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, groups } from "@/lib/schema";
-import { asc, isNull } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { UserRow, CreateUserModal } from "./UserActions";
 import { Suspense } from "react";
 import UsersFilterBar from "./UsersFilterBar";
-import { canManageUsers } from "@/lib/rbac";
+import { canViewStudents, canManageUsers } from "@/lib/rbac";
 import CreateUserButton from "./CreateUserButton";
 import PerPageSelect from "@/components/PerPageSelect";
 
@@ -19,7 +19,10 @@ export default async function AdminUsersPage({
   searchParams: Promise<{ q?: string; group?: string; status?: string; role?: string; page?: string; perPage?: string }>;
 }) {
   const session = await auth();
-  if (!session || !canManageUsers(session.user.role)) redirect("/admin");
+  if (!session || !canViewStudents(session.user.role)) redirect("/admin");
+
+  const isAdmin = canManageUsers(session.user.role);
+  const isTeacher = session.user.role === "teacher";
 
   const { q = "", group = "", status = "", role: roleFilter = "", page: pageStr = "1", perPage: perPageStr = "25" } = await searchParams;
   const page    = Math.max(1, parseInt(pageStr, 10));
@@ -30,7 +33,16 @@ export default async function AdminUsersPage({
   let dbError = false;
 
   try {
-    allUsers = await db.select().from(users).where(isNull(users.deletedAt)).orderBy(asc(users.createdAt));
+    if (isTeacher) {
+      // Teachers only see their own students
+      allUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.teacherId, session.user.id))
+        .orderBy(asc(users.createdAt));
+    } else {
+      allUsers = await db.select().from(users).where(isNull(users.deletedAt)).orderBy(asc(users.createdAt));
+    }
     allGroups = await db.select().from(groups).orderBy(asc(groups.name));
   } catch {
     dbError = true;
@@ -67,52 +79,55 @@ export default async function AdminUsersPage({
         </div>
       ) : (
         <>
-          {/* ── Staff section ── */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-gray-900">Sistem İşçiləri
-                <span className="ml-2 text-sm font-normal text-gray-400">({filteredStaff.length})</span>
-              </h2>
-              <CreateUserButton />
-            </div>
-            <div className="card overflow-hidden">
-              {filteredStaff.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-6">Sistem işçisi yoxdur</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Rol</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
-                        <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
-                        <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredStaff.map((u) => (
-                        <UserRow key={u.id} student={u} showRole />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </section>
+          {/* ── Staff section (admin only) ── */}
+          {isAdmin && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-gray-900">Sistem İşçiləri
+                  <span className="ml-2 text-sm font-normal text-gray-400">({filteredStaff.length})</span>
+                </h2>
+                <CreateUserButton />
+              </div>
+              <div className="card overflow-hidden">
+                {filteredStaff.length === 0 ? (
+                  <p className="text-gray-400 text-sm text-center py-6">Sistem işçisi yoxdur</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50">
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Ad Soyad</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Rol</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">E-poçt</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Status</th>
+                          <th className="text-left px-3 py-3 text-gray-500 font-medium">Tarix</th>
+                          <th className="text-right px-3 py-3 text-gray-500 font-medium">Əməliyyatlar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStaff.map((u) => (
+                          <UserRow key={u.id} student={u} showRole canApprove={isAdmin} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* ── Students section ── */}
           <section>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Tələbələr
+                <h2 className="text-lg font-bold text-gray-900">
+                  {isTeacher ? "Öz Tələbələrim" : "Tələbələr"}
                   <span className="ml-2 text-sm font-normal text-gray-400">
                     {filteredStudents.length} / {students.length}
                   </span>
                 </h2>
                 {pendingCount > 0 && (
-                  <p className="text-amber-700 text-sm mt-0.5">{pendingCount} tələbə admin təsdiqini gözləyir</p>
+                  <p className="text-amber-700 text-sm mt-0.5">{pendingCount} tələbə təsdiqini gözləyir</p>
                 )}
               </div>
             </div>
@@ -146,7 +161,7 @@ export default async function AdminUsersPage({
                     </thead>
                     <tbody>
                       {paginatedStudents.map((student) => (
-                        <UserRow key={student.id} student={student} />
+                        <UserRow key={student.id} student={student} canApprove={isAdmin || isTeacher} />
                       ))}
                     </tbody>
                   </table>

@@ -271,7 +271,7 @@ function SoftDeleteModal({ user, onClose }: { user: User; onClose: () => void })
   );
 }
 
-export function UserRow({ student, showRole }: { student: User; showRole?: boolean }) {
+export function UserRow({ student, showRole, canApprove }: { student: User; showRole?: boolean; canApprove?: boolean }) {
   const router = useRouter();
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -339,12 +339,13 @@ export function UserRow({ student, showRole }: { student: User; showRole?: boole
             <span className="text-xs text-gray-400 italic">Deaktiv</span>
           ) : (
             <div className="flex items-center justify-end gap-1 flex-wrap">
-              {!isVerified ? (
+              {canApprove && !isVerified && (
                 <button onClick={() => doAction("verify")} disabled={actionLoading === "verify"}
                   className="text-xs text-green-700 hover:text-green-900 font-medium px-2 py-1 rounded hover:bg-green-50">
                   {actionLoading === "verify" ? "..." : "Təsdiqlə"}
                 </button>
-              ) : (
+              )}
+              {canApprove && isVerified && (
                 <button onClick={() => doAction("unverify")} disabled={actionLoading === "unverify"}
                   className="text-xs text-amber-600 hover:text-amber-800 font-medium px-2 py-1 rounded hover:bg-amber-50">
                   {actionLoading === "unverify" ? "..." : "Ləğv et"}

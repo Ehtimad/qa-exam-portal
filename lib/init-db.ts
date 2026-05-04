@@ -166,6 +166,9 @@ export async function initDatabase() {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_reason TEXT`;
   await sql`ALTER TABLE exams ADD COLUMN IF NOT EXISTS target_type TEXT NOT NULL DEFAULT 'all'`;
 
+  // ── Multi-tenancy: teacher → students relationship ────────────────────
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS teacher_id TEXT REFERENCES users(id) ON DELETE SET NULL`;
+
   // Sync is_student flag: non-student roles → false
   await sql`UPDATE users SET is_student = false WHERE role IN ('admin','manager','reporter','worker','teacher') AND is_student = true`;
 
@@ -231,6 +234,57 @@ export async function initDatabase() {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       PRIMARY KEY (notification_id, user_id)
     )`;
+
+  // ── Feedback system ───────────────────────────────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS feedbacks (
+      id TEXT PRIMARY KEY,
+      from_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      to_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      rating INTEGER NOT NULL,
+      comment TEXT,
+      type TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
+  // ── Teacher forms (surveys) ───────────────────────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS teacher_forms (
+      id TEXT PRIMARY KEY,
+      teacher_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      questions TEXT NOT NULL DEFAULT '[]',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS teacher_form_answers (
+      id TEXT PRIMARY KEY,
+      form_id TEXT NOT NULL REFERENCES teacher_forms(id) ON DELETE CASCADE,
+      student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      answers TEXT NOT NULL DEFAULT '{}',
+      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+
+  // ── Default teacher: assign existing students to Ehtimad İsmayılov ───
+  {
+    const [teacher] = await sql`
+      SELECT id FROM users
+      WHERE role = 'teacher'
+        AND (name ILIKE '%Ehtimad%' OR email ILIKE '%ehtimad%')
+        AND deleted_at IS NULL
+      LIMIT 1`;
+    if (teacher) {
+      await sql`
+        UPDATE users
+        SET teacher_id = ${teacher.id}
+        WHERE role = 'student'
+          AND teacher_id IS NULL
+          AND deleted_at IS NULL`;
+    }
+  }
 
   // ── Seed admin ───────────────────────────────────────────────────────
   const [adminRow] = await sql`SELECT count(*)::int AS c FROM users WHERE role='admin'`;

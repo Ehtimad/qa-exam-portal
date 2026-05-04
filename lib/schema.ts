@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   isStudent:       boolean("is_student").notNull().default(true),
   groupName:       text("group_name"),    // legacy — kept for existing rows
   groupId:         text("group_id").references(() => groups.id, { onDelete: "set null" }),
+  teacherId:       text("teacher_id"),    // FK added post-creation via ALTER; references users.id
   isBlocked:       boolean("is_blocked").notNull().default(false),
   lastSeenAt:      timestamp("last_seen_at"),
   createdAt:       timestamp("created_at").notNull().defaultNow(),
@@ -196,6 +197,37 @@ export const notificationReads = pgTable("notification_reads", {
   userId:         text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
 }, (t) => ({ pk: primaryKey({ columns: [t.notificationId, t.userId] }) }));
 
+// ─── FEEDBACKS ───────────────────────────────────────────────────────────
+export const feedbacks = pgTable("feedbacks", {
+  id:          text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  fromUserId:  text("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  toUserId:    text("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rating:      integer("rating").notNull(),   // 1-5
+  comment:     text("comment"),
+  type:        text("type").notNull(),        // "student_to_teacher" | "teacher_to_student"
+  createdAt:   timestamp("created_at").notNull().defaultNow(),
+});
+
+// ─── TEACHER FORMS ───────────────────────────────────────────────────────
+export const teacherForms = pgTable("teacher_forms", {
+  id:          text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  teacherId:   text("teacher_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title:       text("title").notNull(),
+  description: text("description"),
+  isActive:    boolean("is_active").notNull().default(true),
+  questions:   text("questions").notNull().default("[]"), // JSON: FormQuestion[]
+  createdAt:   timestamp("created_at").notNull().defaultNow(),
+});
+
+// ─── TEACHER FORM ANSWERS ────────────────────────────────────────────────
+export const teacherFormAnswers = pgTable("teacher_form_answers", {
+  id:          text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  formId:      text("form_id").notNull().references(() => teacherForms.id, { onDelete: "cascade" }),
+  studentId:   text("student_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  answers:     text("answers").notNull().default("{}"), // JSON: { [questionIndex]: string }
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+});
+
 // ─── ACTIVITY LOGS ───────────────────────────────────────────────────────
 export const activityLogs = pgTable("activity_logs", {
   id:         text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -227,3 +259,6 @@ export type Notification   = typeof notifications.$inferSelect;
 export type Advertisement  = typeof advertisements.$inferSelect;
 export type ActivityLog    = typeof activityLogs.$inferSelect;
 export type NotificationRead = typeof notificationReads.$inferSelect;
+export type Feedback       = typeof feedbacks.$inferSelect;
+export type TeacherForm    = typeof teacherForms.$inferSelect;
+export type TeacherFormAnswer = typeof teacherFormAnswers.$inferSelect;
