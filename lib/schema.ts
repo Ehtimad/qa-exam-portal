@@ -80,6 +80,8 @@ export const questions = pgTable("questions", {
   points:         integer("points").notNull(),
   imageUrl:       text("image_url"),
   explanation:    text("explanation"),
+  teacherId:      text("teacher_id"),               // owner; null = global
+  deletedAt:      timestamp("deleted_at"),
   createdAt:      timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -88,12 +90,14 @@ export const exams = pgTable("exams", {
   id:               text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   title:            text("title").notNull(),
   groupId:          text("group_id").references(() => groups.id, { onDelete: "set null" }),
+  teacherId:        text("teacher_id"),   // owner; null = global (admin-created)
   timeLimitMinutes: integer("time_limit_minutes"),
   isActive:         boolean("is_active").notNull().default(false),
   shuffleQuestions: boolean("shuffle_questions").notNull().default(true),
   shuffleOptions:   boolean("shuffle_options").notNull().default(true),
   targetType:       text("target_type").notNull().default("all"),
   // "all" | "student" | "non-student"
+  deletedAt:        timestamp("deleted_at"),
   createdAt:        timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -152,6 +156,7 @@ export const materials = pgTable("materials", {
   startDate:  timestamp("start_date").notNull().defaultNow(),
   endDate:    timestamp("end_date"),  // null = no expiry
   createdBy:  text("created_by").references(() => users.id, { onDelete: "set null" }),
+  deletedAt:  timestamp("deleted_at"),
   createdAt:  timestamp("created_at").notNull().defaultNow(),
 });
 

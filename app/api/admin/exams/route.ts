@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { exams, examQuestions, groups, questions } from "@/lib/schema";
-import { asc, eq, inArray } from "drizzle-orm";
+import { exams, examQuestions, groups } from "@/lib/schema";
+import { asc, eq, isNull, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManageExams } from "@/lib/rbac";
 
-async function requireAdmin() {
+async function requireExamManager() {
   const s = await auth();
   return canManageExams(s?.user?.role ?? "") ? s : null;
 }
@@ -23,24 +23,32 @@ const examSchema = z.object({
 });
 
 export async function GET() {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const session = await requireExamManager();
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const isTeacher = session.user.role === "teacher";
 
   const allExams = await db.select({
-    id: exams.id,
-    title: exams.title,
-    groupId: exams.groupId,
+    id:               exams.id,
+    title:            exams.title,
+    groupId:          exams.groupId,
+    teacherId:        exams.teacherId,
     timeLimitMinutes: exams.timeLimitMinutes,
-    isActive: exams.isActive,
+    isActive:         exams.isActive,
     shuffleQuestions: exams.shuffleQuestions,
-    shuffleOptions: exams.shuffleOptions,
-    createdAt: exams.createdAt,
-    groupName: groups.name,
+    shuffleOptions:   exams.shuffleOptions,
+    createdAt:        exams.createdAt,
+    groupName:        groups.name,
   })
     .from(exams)
     .leftJoin(groups, eq(exams.groupId, groups.id))
+    .where(
+      isTeacher
+        ? and(isNull(exams.deletedAt), eq(exams.teacherId, session.user.id))
+        : isNull(exams.deletedAt)
+    )
     .orderBy(asc(exams.createdAt));
 
-  // Get question counts
   const eqRows = await db.select({ examId: examQuestions.examId }).from(examQuestions);
   const countMap: Record<string, number> = {};
   for (const r of eqRows) {
@@ -51,17 +59,21 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const session = await requireExamManager();
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const body = await req.json();
   const parsed = examSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
 
   const { title, groupId, timeLimitMinutes, isActive = false, shuffleQuestions = true, shuffleOptions = true, questionIds = [] } = parsed.data;
+  const isTeacher = session.user.role === "teacher";
 
   const [exam] = await db.insert(exams).values({
     id: crypto.randomUUID(),
     title,
     groupId: groupId ?? null,
+    teacherId: isTeacher ? session.user.id : null,
     timeLimitMinutes: timeLimitMinutes ?? null,
     isActive,
     shuffleQuestions,

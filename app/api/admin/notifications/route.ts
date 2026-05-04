@@ -1,9 +1,9 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { notifications } from "@/lib/schema";
+import { notifications, users } from "@/lib/schema";
 import { canSendNotifications } from "@/lib/rbac";
 import { pusher } from "@/lib/pusher";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { logActivity } from "@/lib/activity";
 
@@ -26,6 +26,20 @@ export async function POST(req: NextRequest) {
   const { title, message, type, userId, groupId } = await req.json();
   if (!title || !message || !type) {
     return NextResponse.json({ error: "title, message, type required" }, { status: 400 });
+  }
+
+  const isTeacher = session.user.role === "teacher";
+
+  // Teachers can only send individual notifications to their own students
+  if (isTeacher) {
+    if (type !== "individual" || !userId) {
+      return NextResponse.json({ error: "Müəllimlər yalnız öz tələbələrinə bildiriş göndərə bilər" }, { status: 403 });
+    }
+    const [target] = await db.select({ teacherId: users.teacherId }).from(users)
+      .where(and(eq(users.id, userId), eq(users.role, "student"))).limit(1);
+    if (!target || target.teacherId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   let row: typeof notifications.$inferSelect;

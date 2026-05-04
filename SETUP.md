@@ -1,4 +1,4 @@
-# QA Online Exam Portal — Quraşdırma Təlimatı (v12)
+# QA Online Exam Portal — Quraşdırma Təlimatı (v13)
 
 ## Texniki Stack
 
@@ -145,11 +145,26 @@ Keçid balı: **70%** (350 bal)
 | `manager` | Admin (geniş) |
 | `reporter` | Nəticələr, Analytics |
 | `worker` | Suallar, Import |
-| `teacher` | Öz tələbələri, Approve, Materiallar, Bildirişlər, Rəylər, Sorğular |
+| `teacher` | Yalnız **öz** tələbələri/sualları/imtahanları/materialları/nəticələri |
 
 ---
 
-## 8. v12 Xüsusiyyətlər
+## 8. v13 Xüsusiyyətlər
+
+| Xüsusiyyət | Açıqlama |
+|---|---|
+| **Müəllim məlumat izolyasiyası** | Teacher yalnız öz `teacher_id`-si ilə bağlı resurslara baxır/idarə edir |
+| **Sual izolyasiyası** | Teacher öz yaratdığı sualları görür (`teacher_id` = user.id) |
+| **İmtahan izolyasiyası** | Teacher öz imtahanlarını görür; admin imtahanları görünmür |
+| **Material izolyasiyası** | Teacher öz yüklədiklərini görür (`created_by` filter) |
+| **Nəticə izolyasiyası** | Teacher yalnız öz tələbələrinin nəticələrini görür |
+| **Bildiriş məhdudiyyəti** | Teacher yalnız öz tələbəsinə fərdi bildiriş göndərə bilir |
+| **Soft Delete (hər yerdə)** | `deleted_at` timestamp — exams, questions, materials, users. Hard delete yoxdur |
+| **Ownership check** | GET/PUT/DELETE hər endpointdə `forbidden` yoxlaması (403 vs 404) |
+
+---
+
+## 9. v12 Xüsusiyyətlər
 
 | Xüsusiyyət | Açıqlama |
 |---|---|
@@ -187,6 +202,9 @@ Yeni sütunlar (əlavə edilib, data pozulmayıb):
 - `users.is_student`, `users.deleted_at`, `users.deletion_reason`
 - `users.teacher_id` — müəllim-tələbə əlaqəsi (v12)
 - `exams.target_type`
+- `exams.teacher_id`, `exams.deleted_at` — müəllim sahib + soft delete (v13)
+- `questions.teacher_id`, `questions.deleted_at` — müəllim sahib + soft delete (v13)
+- `materials.deleted_at` — soft delete (v13)
 
 Yeni cədvəllər (yaradılıb):
 - `materials`, `messages`, `notifications`, `advertisements`, `activity_logs`

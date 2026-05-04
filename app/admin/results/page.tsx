@@ -22,6 +22,8 @@ export default async function AdminResultsPage({
   const page = Math.max(1, parseInt(pageStr, 10));
   const perPage = [10, 25, 50, 100].includes(Number(perPageStr)) ? Number(perPageStr) : 25;
 
+  const isTeacher = session.user.role === "teacher";
+
   const allResults = await db
     .select({
       id: examAttempts.id,
@@ -37,6 +39,7 @@ export default async function AdminResultsPage({
     })
     .from(examAttempts)
     .leftJoin(users, eq(examAttempts.userId, users.id))
+    .where(isTeacher ? eq(users.teacherId, session.user.id) : undefined)
     .orderBy(sql`${examAttempts.completedAt} DESC`);
 
   const groups = [...new Set(allResults.map((r) => r.userGroup).filter(Boolean))] as string[];

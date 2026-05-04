@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { materials } from "@/lib/schema";
 import { canManageMaterials } from "@/lib/rbac";
-import { desc } from "drizzle-orm";
+import { desc, isNull, eq, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
@@ -11,7 +11,14 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rows = await db.select().from(materials).orderBy(desc(materials.createdAt));
+  const isTeacher = session.user.role === "teacher";
+  const rows = await db.select().from(materials)
+    .where(
+      isTeacher
+        ? and(isNull(materials.deletedAt), eq(materials.createdBy, session.user.id))
+        : isNull(materials.deletedAt)
+    )
+    .orderBy(desc(materials.createdAt));
   return NextResponse.json(rows);
 }
 

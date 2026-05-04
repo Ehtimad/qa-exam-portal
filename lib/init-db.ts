@@ -169,9 +169,14 @@ export async function initDatabase() {
   await sql`ALTER TABLE exams ADD COLUMN IF NOT EXISTS target_type TEXT NOT NULL DEFAULT 'all'`;
 
   // ── Multi-tenancy: teacher → students relationship ────────────────────
-  // No FK constraint here — self-referencing FKs can fail on Neon cold starts;
-  // application-level validation ensures referential integrity instead.
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS teacher_id TEXT`;
+
+  // ── Teacher isolation: ownership + soft delete on core tables ────────
+  await sql`ALTER TABLE exams ADD COLUMN IF NOT EXISTS teacher_id TEXT`;
+  await sql`ALTER TABLE exams ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE questions ADD COLUMN IF NOT EXISTS teacher_id TEXT`;
+  await sql`ALTER TABLE questions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE materials ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`;
 
   // Sync is_student flag: non-student roles → false
   await sql`UPDATE users SET is_student = false WHERE role IN ('admin','manager','reporter','worker','teacher') AND is_student = true`;

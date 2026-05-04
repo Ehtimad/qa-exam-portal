@@ -1,12 +1,23 @@
-# QA Exam Portal — Tam Sənədləşmə (v12 — Teacher Ecosystem, Feedback & Survey Module)
+# QA Exam Portal — Tam Sənədləşmə (v13 — Teacher Data Isolation & Soft Delete)
 
 > **Canlı:** https://exam-portal-nine-azure.vercel.app  
 > **Repo:** GitHub — Ehtimad/qa-exam-portal  
-> **Son versiya:** v12 — Müəllim ekosistemi, rəy sistemi, sorğu modulu
+> **Son versiya:** v13 — Müəllim məlumat izolyasiyası, Soft Delete
 
 ---
 
 ## Changelog
+
+### v13 (2026-05-04)
+- **Müəllim məlumat izolyasiyası (tam):** Teacher yalnız öz yaratdığı sualları, imtahanları, materialları görür. `WHERE teacher_id = session.user.id` bütün resurslarda tətbiq edildi.
+- **Sual sahib sistemi:** `questions.teacher_id` — sual müəllimə məxsusdur; `null` = global (admin/manager yaratdığı).
+- **İmtahan sahib sistemi:** `exams.teacher_id` — eyni prinsip.
+- **Material sahib sistemi:** `materials.created_by` mövcud sütunu ilə filtrlənir.
+- **Nəticə filtri:** `/admin/results` teacher rolunda `WHERE users.teacher_id = session.user.id` tətbiq edir.
+- **Bildiriş məhdudiyyəti:** Teacher yalnız öz tələbəsinə fərdi bildiriş göndərə bilir; qrup/hamı növü bloklanır.
+- **Soft Delete (hər yerdə):** `exams.deleted_at`, `questions.deleted_at`, `materials.deleted_at` — hard delete tamamilə ləğv edildi. Bütün DELETE endpointlər `deletedAt = new Date()` set edir.
+- **Ownership check pattern:** `getExamAndCheckOwnership()`, `getQAndCheckOwnership()`, `getMaterialAndCheckOwnership()` helper funksiyaları — 403 (özün deyil) vs 404 (tapılmadı) ayrımı.
+- **RBAC genişləndirildi:** `canManageQuestions` → teacher daxil edildi; `canManageExams` → teacher daxil edildi; `canViewResults` → teacher daxil edildi.
 
 ### v12 (2026-05-04)
 - **Multi-tenancy:** `teacher_id` sütunu `users` cədvəlinə əlavə edildi. Hər tələbə bir müəllimə bağlıdır.
@@ -80,26 +91,26 @@
 | `manager` | Suallar, qruplar, imtahanlar, nəticələr, materiallar, elanlar | ✅ Geniş |
 | `reporter` | Yalnız nəticələr, analitika, export | ✅ Məhdud |
 | `worker` | Sual yükləmə/import, sual idarəsi | ✅ Məhdud |
-| `teacher` | Materiallar, bildirişlər, tələbə siyahısı | ✅ Məhdud |
+| `teacher` | Yalnız **öz** tələbələri/sualları/imtahanları/materialları/nəticələri | ✅ Məhdud |
 
-### 2.2 İcazə Matriksi
+### 2.2 İcazə Matriksi (v13)
 
 | Funksiya | admin | manager | reporter | worker | teacher |
 |---|---|---|---|---|---|
-| İstifadəçiləri gör/idarə et | ✅ | ❌ | ❌ | ❌ | ❌ |
+| İstifadəçiləri gör/idarə et | ✅ | ❌ | ❌ | ❌ | ✅ (yalnız öz tələbələri) |
 | Rol təyin et | ✅ | ❌ | ❌ | ❌ | ❌ |
 | İstifadəçini sil (soft) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Impersonation | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Sualları idarə et | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Sualları idarə et | ✅ | ✅ | ❌ | ✅ | ✅ (yalnız öz sualları) |
 | Sual import/şablon | ✅ | ✅ | ❌ | ✅ | ❌ |
 | Qrupları idarə et | ✅ | ✅ | ❌ | ❌ | ❌ |
-| İmtahanları idarə et | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Nəticələri gör | ✅ | ✅ | ✅ | ❌ | ❌ |
+| İmtahanları idarə et | ✅ | ✅ | ❌ | ❌ | ✅ (yalnız öz imtahanları) |
+| Nəticələri gör | ✅ | ✅ | ✅ | ❌ | ✅ (yalnız öz tələbələri) |
 | Export (PDF/Excel) | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Analitika | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Materialları idarə et | ✅ | ✅ | ❌ | ❌ | ✅ |
-| Tələbə siyahısına bax | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Bildiriş göndər | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Materialları idarə et | ✅ | ✅ | ❌ | ❌ | ✅ (yalnız öz materialları) |
+| Tələbə siyahısına bax | ✅ | ✅ | ✅ | ❌ | ✅ (yalnız öz tələbələri) |
+| Bildiriş göndər | ✅ | ✅ | ❌ | ❌ | ✅ (yalnız öz tələbəsinə, fərdi) |
 | Elanları idarə et | ✅ | ✅ | ❌ | ❌ | ❌ |
 
 ### 2.3 `lib/rbac.ts` — Bütün helper funksiyalar
@@ -107,10 +118,10 @@
 ```typescript
 isStaff(role)              // admin|manager|reporter|worker|teacher
 canManageUsers(role)       // yalnız admin
-canManageQuestions(role)   // admin|manager|worker
+canManageQuestions(role)   // admin|manager|worker|teacher
 canManageGroups(role)      // admin|manager
-canManageExams(role)       // admin|manager
-canViewResults(role)       // admin|manager|reporter
+canManageExams(role)       // admin|manager|teacher
+canViewResults(role)       // admin|manager|reporter|teacher
 canExportResults(role)     // admin|manager|reporter
 canViewAnalytics(role)     // admin|manager|reporter
 canUploadQuestions(role)   // admin|manager|worker

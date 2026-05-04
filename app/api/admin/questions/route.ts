@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { questions } from "@/lib/schema";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNull, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { canManageQuestions } from "@/lib/rbac";
 
-async function requireAdmin() {
+async function requireQManager() {
   const s = await auth();
   return canManageQuestions(s?.user?.role ?? "") ? s : null;
 }
@@ -26,20 +26,35 @@ const questionSchema = z.object({
 });
 
 export async function GET() {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const all = await db.select().from(questions).orderBy(asc(questions.lectureId), asc(questions.id));
+  const session = await requireQManager();
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const isTeacher = session.user.role === "teacher";
+
+  const all = await db
+    .select()
+    .from(questions)
+    .where(
+      isTeacher
+        ? and(isNull(questions.deletedAt), eq(questions.teacherId, session.user.id))
+        : isNull(questions.deletedAt)
+    )
+    .orderBy(asc(questions.lectureId), asc(questions.id));
+
   return NextResponse.json(all);
 }
 
 export async function POST(req: NextRequest) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const session = await requireQManager();
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const body = await req.json();
   const parsed = questionSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil", details: parsed.error.flatten() }, { status: 400 });
 
   const { id, lectureId, text, type, options, correctAnswers, difficulty, points, imageUrl, explanation } = parsed.data;
+  const isTeacher = session.user.role === "teacher";
 
-  // Auto-assign next id if not provided
   let newId = id;
   if (!newId) {
     const allIds = await db.select({ id: questions.id }).from(questions);
@@ -57,6 +72,7 @@ export async function POST(req: NextRequest) {
     points,
     imageUrl: imageUrl ?? null,
     explanation: explanation ?? null,
+    teacherId: isTeacher ? session.user.id : null,
   }).returning();
 
   revalidatePath("/admin/questions");

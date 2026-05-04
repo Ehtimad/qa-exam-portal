@@ -27,7 +27,7 @@ export function canManageUsers(role: string): boolean {
 }
 
 export function canManageQuestions(role: string): boolean {
-  return ["admin", "manager", "worker"].includes(role);
+  return ["admin", "manager", "worker", "teacher"].includes(role);
 }
 
 export function canManageGroups(role: string): boolean {
@@ -35,11 +35,11 @@ export function canManageGroups(role: string): boolean {
 }
 
 export function canManageExams(role: string): boolean {
-  return ["admin", "manager"].includes(role);
+  return ["admin", "manager", "teacher"].includes(role);
 }
 
 export function canViewResults(role: string): boolean {
-  return ["admin", "manager", "reporter"].includes(role);
+  return ["admin", "manager", "reporter", "teacher"].includes(role);
 }
 
 export function canExportResults(role: string): boolean {
