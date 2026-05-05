@@ -1,4 +1,4 @@
-# QA Online Exam Portal — Quraşdırma Təlimatı (v13)
+# QA Online Exam Portal — Quraşdırma Təlimatı (v15)
 
 ## Texniki Stack
 
@@ -103,16 +103,25 @@ Default credentials:
 
 ### Tələbə:
 ```
-Qeydiyyat → "Tələbəsən?" = ON (mavi toggle)
+Qeydiyyat → "Tələbə" seç → Qrup + Müəllim seç
   ↓
-Admin /admin/users → "Təsdiqlə"
+Admin/Müəllim /admin/users → "Təsdiqlə"
   ↓
 /dashboard → /exam → /dashboard/materials → /messages
 ```
 
-### Qeyri-tələbə (işçi, reporter, və s.):
+### Müəllim:
 ```
-Qeydiyyat → "Tələbəsən?" = OFF
+Qeydiyyat → "Müəllim" seç (qrup lazım deyil)
+  ↓
+Admin /admin/users → "Təsdiqlə"
+  ↓
+/admin → öz tələbələri/sualları/imtahanları/materialları
+```
+
+### Digər (işçi, reporter, və s.):
+```
+Qeydiyyat → "Digər" seç
   ↓
 Dərhal giriş (admin təsdiqi yoxdur)
 ```
@@ -149,65 +158,70 @@ Keçid balı: **70%** (350 bal)
 
 ---
 
-## 8. v13 Xüsusiyyətlər
+## 8. v15 Xüsusiyyətlər
+
+| Xüsusiyyət | Açıqlama |
+|---|---|
+| **3-yollu qeydiyyat** | "Tələbə / Müəllim / Digər" seçimi; müəllim admin təsdiqi ilə aktivləşir |
+| **Müəllim qeydiyyatı** | Müəllim qeydiyyatı zamanı qrup seçimi tələb olunmur |
+| **Tələbə yaratma (müəllim)** | Müəllim öz panelindən birbaşa tələbə əlavə edə bilir |
+| **Sual müəllimi (admin UI)** | Sual add/edit modalında müəllim seçimi dropdown-u (yalnız admin) |
+| **Toplu müəllim təyin etmə** | Suallar cədvəlində seçilənləri "Müəllimə Təhkim Et" ilə toplu təyin et |
+| **CSV teacher sütunu** | CSV import-da `teacher` sütunu — e-poçt və ya ID qəbul edir |
+| **CSV şablon yeniləndi** | Şablonda `teacher` sütunu + mövcud müəllimlər istinad bloku |
+| **İstifadəçi filter (müəllim)** | Admin users səhifəsində müəllim filter dropdown-u |
+| **Brute-force qorunması** | 15 dəqiqədə 10 yanlış cəhd → email bloklanır (`login_rate_limits` cədvəli) |
+
+---
+
+## 9. v14 Xüsusiyyətlər
+
+| Xüsusiyyət | Açıqlama |
+|---|---|
+| **Dashboard izolyasiyası** | Müəllim dashboard-da yalnız öz tələbə sayı/cəhdlərini görür |
+| **Blok/İmpersonation məhdudiyyəti** | Müəllim digər istifadəçiləri blok edə / impersonate edə bilməz |
+
+---
+
+## 10. v13 Xüsusiyyətlər
 
 | Xüsusiyyət | Açıqlama |
 |---|---|
 | **Müəllim məlumat izolyasiyası** | Teacher yalnız öz `teacher_id`-si ilə bağlı resurslara baxır/idarə edir |
-| **Sual izolyasiyası** | Teacher öz yaratdığı sualları görür (`teacher_id` = user.id) |
-| **İmtahan izolyasiyası** | Teacher öz imtahanlarını görür; admin imtahanları görünmür |
-| **Material izolyasiyası** | Teacher öz yüklədiklərini görür (`created_by` filter) |
-| **Nəticə izolyasiyası** | Teacher yalnız öz tələbələrinin nəticələrini görür |
-| **Bildiriş məhdudiyyəti** | Teacher yalnız öz tələbəsinə fərdi bildiriş göndərə bilir |
 | **Soft Delete (hər yerdə)** | `deleted_at` timestamp — exams, questions, materials, users. Hard delete yoxdur |
 | **Ownership check** | GET/PUT/DELETE hər endpointdə `forbidden` yoxlaması (403 vs 404) |
 
 ---
 
-## 9. v12 Xüsusiyyətlər
+## 11. v12 Xüsusiyyətlər
 
 | Xüsusiyyət | Açıqlama |
 |---|---|
 | Real-time mesajlaşma | Pusher ap2 cluster, private kanallar |
 | Bildiriş sistemi | fərdi/qrup/hamıya, anlıq bell ikonu |
 | Material planlaması | start/end tarix, qrupa görə |
-| Elan banneri | rol-filtrli, bağlanabilir |
-| Soft delete | `deleted_at` + `deletion_reason`, səbəb məcburi |
+| Soft delete (users) | `deleted_at` + `deletion_reason`, səbəb məcburi |
 | Teacher rolu | tam panel: materiallar + bildirişlər + tələbə siyahısı |
-| isStudent toggle | qeydiyyatda tələbə/qeyri-tələbə seçimi |
 | Heartbeat | hər 30s `last_seen_at` yenilənir |
 | Fəaliyyət jurnalı | `activity_logs` cədvəli, `/admin/activity` səhifəsi |
-| Admin istifadəçi yaratma | bütün 6 rol dəstəyi, avtomatik email-verify |
-| Online Users səhifəsi | `/admin/online` — müstəqil real-time siyahı |
-| Sertifikat (admin görünüşü) | admin nəticə səhifəsindən birbaşa yüklə |
-| Analitika yeniləndi | tələbə vs qeyri-tələbə, aktiv istifadəçi sıralaması |
-| Back/nav düymələri | bütün alt-səhifələrdə naviqasiya barları |
-| **Multi-tenancy (v12)** | `teacher_id` — hər tələbə bir müəllimə bağlıdır |
-| **Müəllim approve (v12)** | Həm admin, həm teacher öz tələbəsini activate edə bilir |
-| **Rəy sistemi (v12)** | Tələbə müəllimə, müəllim tələbəyə 1-5 ulduz + şərh |
-| **Sorğu modulu (v12)** | Müəllim sorğu yaradır (açıq/seçimli), tələbə cavablayır |
-| **Qeydiyyatda müəllim seçimi (v12)** | Tələbə qeydiyyatda öz müəllimini seçir |
+| Rəy sistemi | Tələbə müəllimə, müəllim tələbəyə 1-5 ulduz + şərh |
+| Sorğu modulu | Müəllim sorğu yaradır (açıq/seçimli), tələbə cavablayır |
 
 ---
 
-## 9. DB Statusu (Neon)
+## 12. DB Statusu (Neon)
 
-Mövcud data (toxunulmayıb):
-- **12 istifadəçi** (8 tələbə, 1 admin, 1 manager, digərləri)
-- **7 imtahan nəticəsi**
-- **33 sual** (DB-də), 100 sual (seed data)
-- **2 qrup**
+Mövcud data (toxunulmayıb — heç bir sətir silinməyib):
+- İstifadəçilər, imtahan nəticələri, suallar, qruplar
 
-Yeni sütunlar (əlavə edilib, data pozulmayıb):
-- `users.is_student`, `users.deleted_at`, `users.deletion_reason`
-- `users.teacher_id` — müəllim-tələbə əlaqəsi (v12)
-- `exams.target_type`
-- `exams.teacher_id`, `exams.deleted_at` — müəllim sahib + soft delete (v13)
-- `questions.teacher_id`, `questions.deleted_at` — müəllim sahib + soft delete (v13)
-- `materials.deleted_at` — soft delete (v13)
+Yeni sütunlar (əlavə edilib, `ADD COLUMN IF NOT EXISTS`):
+- `users.teacher_id` — müəllim-tələbə əlaqəsi
+- `users.deleted_at`, `users.deletion_reason`
+- `exams.teacher_id`, `exams.deleted_at`
+- `questions.teacher_id`, `questions.deleted_at`, `questions.explanation`
+- `materials.deleted_at`
 
 Yeni cədvəllər (yaradılıb):
 - `materials`, `messages`, `notifications`, `advertisements`, `activity_logs`
-- `feedbacks` — rəy sistemi (v12)
-- `teacher_forms` — müəllim sorğuları (v12)
-- `teacher_form_answers` — sorğu cavabları (v12)
+- `feedbacks`, `teacher_forms`, `teacher_form_answers`
+- `login_rate_limits` — brute-force qorunması (v15)
