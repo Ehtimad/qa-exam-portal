@@ -22,6 +22,7 @@ const updateSchema = z.object({
   points: z.number().int().min(1),
   imageUrl: z.string().url().optional().nullable(),
   explanation: z.string().optional().nullable(),
+  teacherId: z.string().nullable().optional(),
 });
 
 async function getQAndCheckOwnership(id: number, session: { user: { id: string; role: string } }) {
@@ -57,16 +58,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
 
-  const { lectureId, text, type, options, correctAnswers, difficulty, points, imageUrl, explanation } = parsed.data;
+  const { lectureId, text, type, options, correctAnswers, difficulty, points, imageUrl, explanation, teacherId } = parsed.data;
 
-  const [updated] = await db.update(questions).set({
+  const isAdmin = session.user.role !== "teacher";
+  const updateValues: Record<string, unknown> = {
     lectureId, text, type,
     options: JSON.stringify(options),
     correctAnswers: JSON.stringify(correctAnswers),
     difficulty, points,
     imageUrl: imageUrl ?? null,
     explanation: explanation ?? null,
-  }).where(eq(questions.id, parseInt(id))).returning();
+  };
+  if (isAdmin && teacherId !== undefined) updateValues.teacherId = teacherId ?? null;
+
+  const [updated] = await db.update(questions).set(updateValues).where(eq(questions.id, parseInt(id))).returning();
 
   if (!updated) return NextResponse.json({ error: "Tapılmadı" }, { status: 404 });
   revalidatePath("/admin/questions");

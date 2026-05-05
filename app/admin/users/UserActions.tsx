@@ -22,6 +22,8 @@ interface User {
 
 const ALL_ROLES = ["student", "admin", "manager", "reporter", "worker", "teacher"] as const;
 
+interface Teacher { id: string; name: string; }
+
 export function CreateUserModal({ onClose, teacherMode = false }: { onClose: () => void; teacherMode?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -29,13 +31,16 @@ export function CreateUserModal({ onClose, teacherMode = false }: { onClose: () 
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("student");
   const [groupId, setGroupId] = useState("");
+  const [teacherId, setTeacherId] = useState("");
   const [isStudent, setIsStudent] = useState(true);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/groups").then((r) => r.json()).then(setGroups).catch(() => {});
+    fetch("/api/teachers").then((r) => r.json()).then(setTeachers).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -50,7 +55,7 @@ export function CreateUserModal({ onClose, teacherMode = false }: { onClose: () 
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), email: email.trim(), password, role, groupId: groupId || null, isStudent }),
+      body: JSON.stringify({ name: name.trim(), email: email.trim(), password, role, groupId: groupId || null, isStudent, teacherId: teacherId || null }),
     });
     setLoading(false);
     if (res.ok) {
@@ -105,6 +110,18 @@ export function CreateUserModal({ onClose, teacherMode = false }: { onClose: () 
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
+          {(teacherMode || role === "student") && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Müəllim <span className="text-gray-400 font-normal">(tələbəyə təhkim et)</span>
+              </label>
+              <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">— Müəllim seçin —</option>
+                {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          )}
           {!teacherMode && role !== "student" && (
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setIsStudent(!isStudent)}

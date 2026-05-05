@@ -12,7 +12,10 @@ interface Question {
   points: number;
   imageUrl?: string | null;
   explanation?: string | null;
+  teacherId?: string | null;
 }
+
+interface Teacher { id: string; name: string; }
 
 interface ExamOption { id: string; name: string; assigned: boolean; }
 
@@ -92,13 +95,22 @@ function ExamMultiSelect({ options, onChange, loading }: {
   );
 }
 
-export default function QuestionsClient({ initialQuestions }: { initialQuestions: Question[] }) {
+export default function QuestionsClient({
+  initialQuestions,
+  isAdmin = false,
+  teachers = [],
+}: {
+  initialQuestions: Question[];
+  isAdmin?: boolean;
+  teachers?: Teacher[];
+}) {
   const router = useRouter();
   const [questions, setQuestions] = useState(initialQuestions);
   const [search, setSearch] = useState("");
   const [editQ, setEditQ] = useState<Question | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [formTeacherId, setFormTeacherId] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [importing, setImporting] = useState(false);
@@ -114,6 +126,11 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
   const [bulkExamOpen, setBulkExamOpen] = useState(false);
   const [bulkExamLoading, setBulkExamLoading] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
+
+  // Bulk teacher assign
+  const [bulkTeacherOpen, setBulkTeacherOpen] = useState(false);
+  const [bulkTeacherId, setBulkTeacherId] = useState<string>("");
+  const [bulkTeacherSaving, setBulkTeacherSaving] = useState(false);
 
   // Pagination
   const [pageSize, setPageSize] = useState(25);
@@ -170,6 +187,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
       imageUrl: q.imageUrl ?? "",
       explanation: q.explanation ?? "",
     });
+    setFormTeacherId(q.teacherId ?? "");
     setError("");
     loadExamsForQuestion(q.id);
   }
@@ -178,6 +196,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     setEditQ(null);
     setShowAdd(true);
     setForm(EMPTY_FORM);
+    setFormTeacherId("");
     setError("");
     loadAllExams();
   }
@@ -221,6 +240,7 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
       explanation: form.explanation || null,
       lectureId: editQ ? (initialQuestions.find((q) => q.id === editQ.id) as unknown as { lectureId?: number })?.lectureId ?? 1 : 1,
       difficulty: "medium" as const,
+      ...(isAdmin ? { teacherId: formTeacherId || null } : {}),
     };
 
     const url = editQ ? `/api/admin/questions/${editQ.id}` : "/api/admin/questions";
@@ -289,6 +309,20 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
     setBulkExamOpen(false);
     setBulkExamOptions([]);
     setSelectedIds(new Set());
+  }
+
+  async function saveBulkTeacher() {
+    setBulkTeacherSaving(true);
+    await fetch("/api/admin/questions/bulk-teacher", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionIds: Array.from(selectedIds), teacherId: bulkTeacherId || null }),
+    });
+    setBulkTeacherSaving(false);
+    setBulkTeacherOpen(false);
+    setBulkTeacherId("");
+    setSelectedIds(new Set());
+    router.refresh();
   }
 
   const showForm = showAdd || editQ !== null;
@@ -387,6 +421,46 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
               </div>
             )}
           </div>
+          {isAdmin && (
+            <div className="relative">
+              {bulkTeacherOpen && (
+                <div className="fixed inset-0 z-10" onClick={() => setBulkTeacherOpen(false)} />
+              )}
+              <button
+                onClick={() => setBulkTeacherOpen((o) => !o)}
+                className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5 relative z-20"
+              >
+                Müəllimə Təhkim Et
+                <svg className={`w-3.5 h-3.5 transition-transform ${bulkTeacherOpen ? "rotate-180" : ""}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {bulkTeacherOpen && (
+                <div className="absolute left-0 top-full mt-1 z-20 w-64 bg-white border border-gray-200 rounded-xl shadow-xl p-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">Müəllim seçin:</p>
+                  <select
+                    value={bulkTeacherId}
+                    onChange={(e) => setBulkTeacherId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm mb-3"
+                  >
+                    <option value="">— Müəllimsiz (admin) —</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button onClick={saveBulkTeacher} disabled={bulkTeacherSaving}
+                      className="btn-primary text-xs flex-1 py-1.5 disabled:opacity-50">
+                      {bulkTeacherSaving ? "Saxlanılır..." : "Saxla"}
+                    </button>
+                    <button onClick={() => { setBulkTeacherOpen(false); setBulkTeacherId(""); }}
+                      className="btn-secondary text-xs flex-1 py-1.5">Ləğv et</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={() => setSelectedIds(new Set())}
             className="ml-auto text-sm text-blue-600 hover:text-blue-800 font-medium">
             Seçimi sıfırla
@@ -541,6 +615,23 @@ export default function QuestionsClient({ initialQuestions }: { initialQuestions
                     className="text-xs text-blue-600 hover:underline mt-2">+ Variant əlavə et</button>
                 )}
               </div>
+
+              {/* Teacher selector (admin only) */}
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Müəllim</label>
+                  <select
+                    value={formTeacherId}
+                    onChange={(e) => setFormTeacherId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">— Müəllimsiz (admin) —</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Exam multi-select */}
               <div>

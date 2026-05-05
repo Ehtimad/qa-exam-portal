@@ -17,7 +17,7 @@ type Group = typeof groups.$inferSelect;
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; group?: string; status?: string; role?: string; page?: string; perPage?: string }>;
+  searchParams: Promise<{ q?: string; group?: string; teacher?: string; status?: string; role?: string; page?: string; perPage?: string }>;
 }) {
   const session = await auth();
   if (!session || !canViewStudents(session.user.role)) redirect("/admin");
@@ -25,12 +25,13 @@ export default async function AdminUsersPage({
   const isAdmin = canManageUsers(session.user.role);
   const isTeacher = session.user.role === "teacher";
 
-  const { q = "", group = "", status = "", role: roleFilter = "", page: pageStr = "1", perPage: perPageStr = "25" } = await searchParams;
+  const { q = "", group = "", teacher: teacherFilter = "", status = "", role: roleFilter = "", page: pageStr = "1", perPage: perPageStr = "25" } = await searchParams;
   const page    = Math.max(1, parseInt(pageStr, 10));
   const perPage = [10, 25, 50, 100].includes(Number(perPageStr)) ? Number(perPageStr) : 25;
 
   let allUsers: DBUser[] = [];
   let allGroups: Group[] = [];
+  let allTeachers: { id: string; name: string | null }[] = [];
   let dbError = false;
 
   // Ensure teacher_id column exists before querying it
@@ -46,6 +47,8 @@ export default async function AdminUsersPage({
         .orderBy(asc(users.createdAt));
     } else {
       allUsers = await db.select().from(users).where(isNull(users.deletedAt)).orderBy(asc(users.createdAt));
+      allTeachers = await db.select({ id: users.id, name: users.name }).from(users)
+        .where(eq(users.role, "teacher")).orderBy(asc(users.name));
     }
     allGroups = await db.select().from(groups).orderBy(asc(groups.name));
   } catch {
@@ -57,14 +60,15 @@ export default async function AdminUsersPage({
 
   function filterList(list: DBUser[]) {
     return list.filter((s) => {
-      const matchQ      = !q || (s.name?.toLowerCase().includes(q.toLowerCase()) || s.email.toLowerCase().includes(q.toLowerCase()));
-      const matchGroup  = !group || s.groupId === group || s.groupName === group;
-      const matchRole   = !roleFilter || s.role === roleFilter;
-      const matchStatus = !status ||
+      const matchQ       = !q || (s.name?.toLowerCase().includes(q.toLowerCase()) || s.email.toLowerCase().includes(q.toLowerCase()));
+      const matchGroup   = !group || s.groupId === group || s.groupName === group;
+      const matchTeacher = !teacherFilter || s.teacherId === teacherFilter;
+      const matchRole    = !roleFilter || s.role === roleFilter;
+      const matchStatus  = !status ||
         (status === "pending"  && !s.emailVerified) ||
         (status === "verified" && !!s.emailVerified) ||
         (status === "blocked"  && s.isBlocked);
-      return matchQ && matchGroup && matchRole && matchStatus;
+      return matchQ && matchGroup && matchTeacher && matchRole && matchStatus;
     });
   }
 
@@ -139,7 +143,7 @@ export default async function AdminUsersPage({
 
             <div className="flex items-center justify-between">
               <Suspense>
-                <UsersFilterBar groups={allGroups} />
+                <UsersFilterBar groups={allGroups} teachers={allTeachers.map(t => ({ id: t.id, name: t.name ?? t.id }))} />
               </Suspense>
               <Suspense>
                 <PerPageSelect value={perPage} />

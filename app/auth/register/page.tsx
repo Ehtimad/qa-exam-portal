@@ -8,10 +8,12 @@ import PasswordInput from "@/components/ui/PasswordInput";
 interface Group { id: string; name: string; }
 interface Teacher { id: string; name: string; email: string; }
 
+type RegRole = "student" | "teacher" | "other";
+
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "", groupId: "", teacherId: "" });
-  const [isStudent, setIsStudent] = useState(true);
+  const [regRole, setRegRole] = useState<RegRole>("student");
   const [groups, setGroups] = useState<Group[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [error, setError] = useState("");
@@ -27,8 +29,8 @@ export default function RegisterPage() {
     setError("");
     if (form.password !== form.confirm) { setError("Şifrələr uyğun deyil"); return; }
     if (form.password.length < 6) { setError("Şifrə ən az 6 simvol olmalıdır"); return; }
-    if (!form.groupId) { setError("Qrup seçin"); return; }
-    if (isStudent && !form.teacherId) { setError("Müəllim seçin"); return; }
+    if (regRole !== "teacher" && !form.groupId) { setError("Qrup seçin"); return; }
+    if (regRole === "student" && !form.teacherId) { setError("Müəllim seçin"); return; }
 
     setLoading(true);
     const res = await fetch("/api/register", {
@@ -38,15 +40,19 @@ export default function RegisterPage() {
         name: form.name,
         email: form.email,
         password: form.password,
-        groupId: form.groupId,
-        teacherId: form.teacherId || null,
-        isStudent,
+        groupId: form.groupId || null,
+        teacherId: regRole === "student" ? (form.teacherId || null) : null,
+        isStudent: regRole === "student",
+        role: regRole === "teacher" ? "teacher" : "student",
       }),
     });
     const data = await res.json();
     setLoading(false);
     if (!res.ok) { setError(data.error ?? "Qeydiyyat xətası"); }
-    else { router.push(isStudent ? "/auth/signin?registered=1" : "/auth/signin?registered=2"); }
+    else {
+      const pending = regRole === "student" || regRole === "teacher";
+      router.push(pending ? "/auth/signin?registered=1" : "/auth/signin?registered=2");
+    }
   }
 
   return (
@@ -64,27 +70,30 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* isStudent toggle */}
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-gray-800">Tələbəsən?</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {isStudent ? "Bəli — müəllim/admin təsdiqi gözlənilir" : "Xeyr — dərhal daxil ola bilərsən"}
-                </p>
+            {/* Role selector */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Hesab növü</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["student", "teacher", "other"] as RegRole[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => { setRegRole(r); setForm((f) => ({ ...f, teacherId: "", groupId: "" })); }}
+                    className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                      regRole === r
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-blue-400"
+                    }`}
+                  >
+                    {r === "student" ? "Tələbə" : r === "teacher" ? "Müəllim" : "Digər"}
+                  </button>
+                ))}
               </div>
-              <button
-                type="button"
-                onClick={() => setIsStudent((v) => !v)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  isStudent ? "bg-blue-600" : "bg-gray-300"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isStudent ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
+              <p className="text-xs text-gray-500 mt-1.5">
+                {regRole === "student" && "Müəllim/admin təsdiqi tələb olunur"}
+                {regRole === "teacher" && "Admin təsdiqi tələb olunur"}
+                {regRole === "other" && "Dərhal daxil ola bilərsən"}
+              </p>
             </div>
 
             <div>
@@ -93,22 +102,24 @@ export default function RegisterPage() {
                 className="input-field" placeholder="Əli Əliyev" required />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Qrup</label>
-              <select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value })}
-                className="input-field" required>
-                <option value="">— Qrup seçin —</option>
-                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            </div>
+            {regRole !== "teacher" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Qrup</label>
+                <select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value })}
+                  className="input-field" required>
+                  <option value="">— Qrup seçin —</option>
+                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+            )}
 
-            {isStudent && (
+            {regRole === "student" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Müəllim <span className="text-red-500">*</span>
                 </label>
                 <select value={form.teacherId} onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
-                  className="input-field" required={isStudent}>
+                  className="input-field" required>
                   <option value="">— Müəllim seçin —</option>
                   {teachers.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
@@ -140,9 +151,11 @@ export default function RegisterPage() {
         </div>
 
         <div className="text-center mt-4 space-y-2">
-          {isStudent && (
+          {(regRole === "student" || regRole === "teacher") && (
             <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-              Qeydiyyatdan sonra müəllim və ya admin tərəfindən təsdiq gözlənilir
+              {regRole === "student"
+                ? "Qeydiyyatdan sonra müəllim və ya admin tərəfindən təsdiq gözlənilir"
+                : "Qeydiyyatdan sonra admin tərəfindən təsdiq gözlənilir"}
             </p>
           )}
           <p className="text-gray-500 text-sm">

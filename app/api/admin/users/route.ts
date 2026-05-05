@@ -17,6 +17,7 @@ const createSchema = z.object({
   password:  z.string().min(6).max(100),
   role:      z.enum(VALID_ROLES).default("student"),
   groupId:   z.string().nullable().optional(),
+  teacherId: z.string().nullable().optional(),
   isStudent: z.boolean().optional(),
 });
 
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
 
-  let { name, email, password, role, groupId, isStudent } = parsed.data;
+  let { name, email, password, role, groupId, teacherId, isStudent } = parsed.data;
 
   // Teachers can only create students
   if (isTeacherActor) role = "student";
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
     groupName,
     isStudent:     studentFlag,
     emailVerified,
-    teacherId:     isTeacherActor ? session.user.id : null,
+    teacherId:     isTeacherActor ? session.user.id : (teacherId ?? null),
   }).returning({ id: users.id, email: users.email });
 
   await logActivity({

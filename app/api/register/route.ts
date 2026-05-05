@@ -5,13 +5,16 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
+const ALLOWED_REGISTER_ROLES = ["student", "teacher"] as const;
+
 const schema = z.object({
   name:      z.string().min(2).max(100),
   email:     z.string().email(),
   password:  z.string().min(6).max(100),
-  groupId:   z.string().min(1),
+  groupId:   z.string().nullable().optional(),
   teacherId: z.string().nullable().optional(),
   isStudent: z.boolean().optional().default(true),
+  role:      z.enum(ALLOWED_REGISTER_ROLES).optional().default("student"),
 });
 
 export async function POST(req: NextRequest) {
@@ -22,9 +25,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
   }
 
-  const { name, email, password, groupId, teacherId, isStudent } = parsed.data;
+  const { name, email, password, groupId, teacherId, isStudent, role } = parsed.data;
 
-  if (isStudent && !teacherId) {
+  if (role === "student" && isStudent && !teacherId) {
     return NextResponse.json({ error: "Tələbə üçün müəllim seçimi məcburidir" }, { status: 400 });
   }
 
@@ -38,14 +41,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Bu e-poçt artıq qeydiyyatdadır" }, { status: 409 });
   }
 
-  const [group] = await db
-    .select({ id: groups.id, name: groups.name })
-    .from(groups)
-    .where(eq(groups.id, groupId))
-    .limit(1);
-
-  if (!group) {
-    return NextResponse.json({ error: "Qrup tapılmadı" }, { status: 400 });
+  let groupName: string | null = null;
+  if (groupId) {
+    const [group] = await db
+      .select({ id: groups.id, name: groups.name })
+      .from(groups)
+      .where(eq(groups.id, groupId))
+      .limit(1);
+    if (!group) return NextResponse.json({ error: "Qrup tapılmadı" }, { status: 400 });
+    groupName = group.name;
+  } else if (role !== "teacher") {
+    return NextResponse.json({ error: "Qrup seçin" }, { status: 400 });
   }
 
   // Validate teacher exists if provided
@@ -62,20 +68,21 @@ export async function POST(req: NextRequest) {
 
   const hashed = await bcrypt.hash(password, 12);
 
-  // Students require email verification (pending approval); non-students are auto-verified
-  const emailVerified = isStudent ? null : new Date();
+  // Students and teachers require approval; "other" is auto-verified
+  const requiresApproval = role === "student" || role === "teacher";
+  const emailVerified = requiresApproval ? null : new Date();
 
   await db.insert(users).values({
     name,
     email,
     password: hashed,
-    role: "student",
-    groupId: group.id,
-    groupName: group.name,
+    role,
+    groupId: groupId ?? null,
+    groupName,
     teacherId: teacherId ?? null,
-    isStudent,
+    isStudent: role === "student" ? isStudent : false,
     emailVerified,
   });
 
-  return NextResponse.json({ success: true, requiresApproval: isStudent }, { status: 201 });
+  return NextResponse.json({ success: true, requiresApproval }, { status: 201 });
 }

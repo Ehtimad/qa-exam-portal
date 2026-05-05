@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { questions, examQuestions, exams } from "@/lib/schema";
+import { questions, examQuestions, exams, users } from "@/lib/schema";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { canUploadQuestions } from "@/lib/rbac";
 
@@ -49,6 +50,11 @@ export async function POST(req: NextRequest) {
   const allExamRows = await db.select({ id: exams.id }).from(exams);
   const validExamIds = new Set(allExamRows.map((e) => e.id));
 
+  // Pre-fetch teachers for email→id resolution
+  const allTeachers = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.role, "teacher"));
+  const teacherByEmail = new Map(allTeachers.map((t) => [t.email.toLowerCase(), t.id]));
+  const teacherById = new Set(allTeachers.map((t) => t.id));
+
   let imported = 0;
   let updated = 0;
   const errors: string[] = [];
@@ -77,19 +83,21 @@ export async function POST(req: NextRequest) {
       let idStr: string, text: string, type: string, rest: string[];
 
       if (isOldFormat) {
-        // Old: id, lecture_id, text, type, opt1..opt6, correct, difficulty, points, explanation?, exam_id?
+        // Old: id, lecture_id, text, type, opt1..opt6, correct, difficulty, points, explanation?, exam_id?, teacher?
         [idStr, , text, type, ...rest] = cols;
-        // rest: opt1..opt6(0-5), correct(6), difficulty(7), points(8), explanation(9), exam_id(10)
+        // rest: opt1..opt6(0-5), correct(6), difficulty(7), points(8), explanation(9), exam_id(10), teacher(11)
         const options = rest.slice(0, 6).filter((o) => o.trim() !== "");
         const correctRaw = rest[6] ?? "";
         const pointsStr = rest[8] ?? "5";
         const explanation = rest[9]?.trim() || null;
         const examIdsRaw = rest[10]?.trim() ?? "";
         const examIds = examIdsRaw ? examIdsRaw.split(";").map((s) => s.trim()).filter(Boolean) : [];
+        const teacherRaw = rest[11]?.trim() ?? "";
 
         const result = await upsertQuestion({
           idStr, text, type, options, correctRaw, points: parseInt(pointsStr),
           explanation, examIds, lineNum, allIds, nextId, validExamIds,
+          teacherRaw, teacherByEmail, teacherById,
         });
         if (result.error) { errors.push(result.error); continue; }
         if (result.warning) { errors.push(result.warning); }
@@ -97,19 +105,21 @@ export async function POST(req: NextRequest) {
         else { updated++; }
 
       } else {
-        // New: id, text, type, opt1..opt6, correct, points, explanation?, exam_ids?
+        // New: id, text, type, opt1..opt6, correct, points, explanation?, exam_ids?, teacher?
         [idStr, text, type, ...rest] = cols;
-        // rest: opt1..opt6(0-5), correct(6), points(7), explanation(8), exam_ids(9)
+        // rest: opt1..opt6(0-5), correct(6), points(7), explanation(8), exam_ids(9), teacher(10)
         const options = rest.slice(0, 6).filter((o) => o.trim() !== "");
         const correctRaw = rest[6] ?? "";
         const pointsStr = rest[7] ?? "5";
         const explanation = rest[8]?.trim() || null;
         const examIdsRaw = rest[9]?.trim() ?? "";
         const examIds = examIdsRaw ? examIdsRaw.split(";").map((s) => s.trim()).filter(Boolean) : [];
+        const teacherRaw = rest[10]?.trim() ?? "";
 
         const result = await upsertQuestion({
           idStr, text, type, options, correctRaw, points: parseInt(pointsStr),
           explanation, examIds, lineNum, allIds, nextId, validExamIds,
+          teacherRaw, teacherByEmail, teacherById,
         });
         if (result.error) { errors.push(result.error); continue; }
         if (result.warning) { errors.push(result.warning); }
@@ -131,8 +141,11 @@ async function upsertQuestion(p: {
   explanation: string | null; examIds: string[];
   lineNum: number; allIds: { id: number }[]; nextId: number;
   validExamIds: Set<string>;
+  teacherRaw?: string;
+  teacherByEmail?: Map<string, string>;
+  teacherById?: Set<string>;
 }): Promise<{ error?: string; warning?: string; wasNew?: boolean; id?: number }> {
-  const { idStr, text, type, options, correctRaw, points, explanation, examIds, lineNum, allIds, nextId, validExamIds } = p;
+  const { idStr, text, type, options, correctRaw, points, explanation, examIds, lineNum, allIds, nextId, validExamIds, teacherRaw = "", teacherByEmail, teacherById } = p;
 
   if (!text.trim()) return { error: `Sətir ${lineNum}: sual mətni boşdur` };
   if (!["single", "multiple"].includes(type)) return { error: `Sətir ${lineNum}: type "single" və ya "multiple" olmalıdır` };
@@ -149,6 +162,20 @@ async function upsertQuestion(p: {
   const id = idStr.trim() ? parseInt(idStr) : nextId;
   if (isNaN(id) || id < 1) return { error: `Sətir ${lineNum}: id yanlışdır` };
 
+  // Resolve teacher_id from teacher_email or direct teacher_id
+  let teacherId: string | null = null;
+  const warnings: string[] = [];
+  if (teacherRaw) {
+    if (teacherRaw.includes("@")) {
+      const found = teacherByEmail?.get(teacherRaw.toLowerCase());
+      if (found) { teacherId = found; }
+      else { warnings.push(`müəllim e-poçtu tapılmadı: ${teacherRaw}`); }
+    } else {
+      if (teacherById?.has(teacherRaw)) { teacherId = teacherRaw; }
+      else { warnings.push(`müəllim ID tapılmadı: ${teacherRaw}`); }
+    }
+  }
+
   const values = {
     lectureId: 1,
     text: text.trim(),
@@ -158,6 +185,7 @@ async function upsertQuestion(p: {
     difficulty: "medium" as const,
     points,
     explanation: explanation?.trim() || null,
+    ...(teacherRaw ? { teacherId } : {}),
   };
 
   const wasExisting = allIds.some((r) => r.id === id);
@@ -171,8 +199,12 @@ async function upsertQuestion(p: {
     await db.insert(examQuestions).values({ examId, questionId: id }).onConflictDoNothing();
   }
 
-  const warning = invalidExamIds.length > 0
-    ? `Sətir ${lineNum}: sual əlavə edildi, lakin aşağıdakı exam_id-lər tapılmadı (keçirildi): ${invalidExamIds.join(", ")}`
+  if (invalidExamIds.length > 0) {
+    warnings.push(`aşağıdakı exam_id-lər tapılmadı (keçirildi): ${invalidExamIds.join(", ")}`);
+  }
+
+  const warning = warnings.length > 0
+    ? `Sətir ${lineNum}: sual əlavə edildi, lakin — ${warnings.join("; ")}`
     : undefined;
 
   return { wasNew: !wasExisting, id, warning };

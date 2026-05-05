@@ -4,8 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
 interface Group { id: string; name: string; }
+interface Teacher { id: string; name: string; }
 
-export default function UsersFilterBar({ groups }: { groups: Group[] }) {
+export default function UsersFilterBar({ groups, teachers = [] }: { groups: Group[]; teachers?: Teacher[] }) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -38,6 +39,18 @@ export default function UsersFilterBar({ groups }: { groups: Group[] }) {
           <option key={g.id} value={g.id}>{g.name}</option>
         ))}
       </select>
+      {teachers.length > 0 && (
+        <select
+          defaultValue={params.get("teacher") ?? ""}
+          onChange={(e) => update("teacher", e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Bütün müəllimlər</option>
+          {teachers.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      )}
       <select
         defaultValue={params.get("status") ?? ""}
         onChange={(e) => update("status", e.target.value)}
