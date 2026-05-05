@@ -7,6 +7,7 @@ import { eq, and, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "@/auth.config";
+import { checkLoginRateLimit, resetLoginRateLimit } from "./rate-limit";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -68,6 +69,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .safeParse(credentials);
         if (!parsed.success) return null;
 
+        // Rate limit check — block after 10 failed attempts in 15 minutes
+        const { blocked } = await checkLoginRateLimit(parsed.data.email).catch(() => ({ blocked: false }));
+        if (blocked) return null;
+
         const [user] = await db
           .select()
           .from(users)
@@ -78,6 +83,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const valid = await bcrypt.compare(parsed.data.password, user.password);
         if (!valid) return null;
+
+        // Reset counter on successful password match
+        await resetLoginRateLimit(parsed.data.email).catch(() => {});
 
         // Soft-delete check
         if (user.deletedAt) return null;

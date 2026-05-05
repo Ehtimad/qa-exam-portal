@@ -375,6 +375,15 @@ export async function initDatabase() {
     }
   }
 
+  // Rate limiting table for brute-force protection
+  await sql`
+    CREATE TABLE IF NOT EXISTS login_rate_limits (
+      email       TEXT        NOT NULL,
+      attempts    INTEGER     NOT NULL DEFAULT 1,
+      window_start TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (email)
+    )`;
+
   initialized = true;
   console.log("[init-db] Verilənlər bazası hazırdır");
 }
