@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { notifications, users } from "@/lib/schema";
 import { canSendNotifications } from "@/lib/rbac";
 import { pusher } from "@/lib/pusher";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { logActivity } from "@/lib/activity";
 
@@ -11,6 +11,19 @@ export async function GET() {
   const session = await auth();
   if (!session?.user || !canSendNotifications(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const isTeacher = session.user.role === "teacher";
+
+  if (isTeacher) {
+    const teacherStudents = await db.select({ id: users.id }).from(users)
+      .where(and(eq(users.teacherId, session.user.id), eq(users.role, "student")));
+    const studentIds = teacherStudents.map((s) => s.id);
+    if (studentIds.length === 0) return NextResponse.json([]);
+    const rows = await db.select().from(notifications)
+      .where(inArray(notifications.userId, studentIds))
+      .orderBy(desc(notifications.createdAt)).limit(100);
+    return NextResponse.json(rows);
   }
 
   const rows = await db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(100);

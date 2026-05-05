@@ -32,6 +32,13 @@ async function requireApprover() {
   return session;
 }
 
+async function requireUserManager() {
+  const session = await auth();
+  if (!session) return null;
+  if (canManageUsers(session.user.role) || session.user.role === "teacher") return session;
+  return null;
+}
+
 export async function GET() {
   if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -57,14 +64,18 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await requireAdmin();
+  const session = await requireUserManager();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const isTeacherActor = session.user.role === "teacher";
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
 
-  const { name, email, password, role, groupId, isStudent } = parsed.data;
+  let { name, email, password, role, groupId, isStudent } = parsed.data;
+
+  // Teachers can only create students
+  if (isTeacherActor) role = "student";
 
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing) return NextResponse.json({ error: "Bu e-poçt artıq mövcuddur" }, { status: 409 });
@@ -77,10 +88,9 @@ export async function POST(req: NextRequest) {
   }
 
   const hash = await bcrypt.hash(password, 12);
-  const isStaff = role !== "student";
-  // Staff accounts and admin-created students are auto-verified
+  const isStaffRole = role !== "student";
   const emailVerified = new Date();
-  const studentFlag = isStudent !== undefined ? isStudent : !isStaff;
+  const studentFlag = isStudent !== undefined ? isStudent : !isStaffRole;
 
   const [newUser] = await db.insert(users).values({
     name,
@@ -91,6 +101,7 @@ export async function POST(req: NextRequest) {
     groupName,
     isStudent:     studentFlag,
     emailVerified,
+    teacherId:     isTeacherActor ? session.user.id : null,
   }).returning({ id: users.id, email: users.email });
 
   await logActivity({

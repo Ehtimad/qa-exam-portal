@@ -22,7 +22,7 @@ interface User {
 
 const ALL_ROLES = ["student", "admin", "manager", "reporter", "worker", "teacher"] as const;
 
-export function CreateUserModal({ onClose }: { onClose: () => void }) {
+export function CreateUserModal({ onClose, teacherMode = false }: { onClose: () => void; teacherMode?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -65,7 +65,9 @@ export function CreateUserModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-5">Yeni İstifadəçi Yarat</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-5">
+          {teacherMode ? "Yeni Tələbə Əlavə Et" : "Yeni İstifadəçi Yarat"}
+        </h2>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ad Soyad</label>
@@ -82,15 +84,17 @@ export function CreateUserModal({ onClose }: { onClose: () => void }) {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {ALL_ROLES.map((r) => (
-                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-              ))}
-            </select>
-          </div>
+          {!teacherMode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+              <select value={role} onChange={(e) => setRole(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                {ALL_ROLES.map((r) => (
+                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Qrup <span className="text-gray-400 font-normal">(tələbələr üçün)</span>
@@ -101,7 +105,7 @@ export function CreateUserModal({ onClose }: { onClose: () => void }) {
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
-          {role !== "student" && (
+          {!teacherMode && role !== "student" && (
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setIsStudent(!isStudent)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isStudent ? "bg-blue-600" : "bg-gray-300"}`}>
@@ -271,7 +275,7 @@ function SoftDeleteModal({ user, onClose }: { user: User; onClose: () => void })
   );
 }
 
-export function UserRow({ student, showRole, canApprove }: { student: User; showRole?: boolean; canApprove?: boolean }) {
+export function UserRow({ student, showRole, canApprove, canBlock = false }: { student: User; showRole?: boolean; canApprove?: boolean; canBlock?: boolean }) {
   const router = useRouter();
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -351,7 +355,7 @@ export function UserRow({ student, showRole, canApprove }: { student: User; show
                   {actionLoading === "unverify" ? "..." : "Ləğv et"}
                 </button>
               )}
-              {!student.isBlocked ? (
+              {canBlock && (!student.isBlocked ? (
                 <button onClick={() => doAction("block")} disabled={actionLoading === "block"}
                   className="text-xs text-orange-600 hover:text-orange-800 font-medium px-2 py-1 rounded hover:bg-orange-50">
                   {actionLoading === "block" ? "..." : "Blokla"}
@@ -361,15 +365,17 @@ export function UserRow({ student, showRole, canApprove }: { student: User; show
                   className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
                   {actionLoading === "unblock" ? "..." : "Bloku aç"}
                 </button>
-              )}
+              ))}
               <button onClick={() => setShowEdit(true)}
                 className="text-xs text-gray-600 hover:text-gray-900 font-medium px-2 py-1 rounded hover:bg-gray-100">
                 Redaktə
               </button>
-              <button onClick={handleImpersonate} disabled={actionLoading === "impersonate"}
-                className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 rounded hover:bg-purple-50">
-                {actionLoading === "impersonate" ? "..." : "Giriş"}
-              </button>
+              {canBlock && (
+                <button onClick={handleImpersonate} disabled={actionLoading === "impersonate"}
+                  className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 rounded hover:bg-purple-50">
+                  {actionLoading === "impersonate" ? "..." : "Giriş"}
+                </button>
+              )}
               <button onClick={() => setShowDeleteModal(true)}
                 className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50">
                 Sil

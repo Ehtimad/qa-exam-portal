@@ -19,25 +19,36 @@ const updateSchema = z.object({
   newPassword: z.string().min(6).max(100).optional(),
 });
 
-async function requireAdmin() {
+async function requireUserEditor() {
   const session = await auth();
-  if (!session || !canManageUsers(session.user.role)) return null;
-  return session;
+  if (!session) return null;
+  if (canManageUsers(session.user.role) || session.user.role === "teacher") return session;
+  return null;
+}
+
+async function getTargetAndCheckOwnership(targetId: string, session: { user: { id: string; role: string } }) {
+  const [target] = await db.select().from(users).where(eq(users.id, targetId)).limit(1);
+  if (!target) return { target: null, forbidden: false };
+  if (session.user.role === "teacher" && target.teacherId !== session.user.id) {
+    return { target: null, forbidden: true };
+  }
+  return { target, forbidden: false };
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireAdmin();
+  const session = await requireUserEditor();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
+  const { target, forbidden } = await getTargetAndCheckOwnership(id, session);
+  if (forbidden) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!target) return NextResponse.json({ error: "İstifadəçi tapılmadı" }, { status: 404 });
+
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Məlumatlar düzgün deyil" }, { status: 400 });
 
   const { name, groupId, email, role, newPassword } = parsed.data;
-
-  const [existing] = await db.select({ id: users.id, groupId: users.groupId }).from(users).where(eq(users.id, id)).limit(1);
-  if (!existing) return NextResponse.json({ error: "İstifadəçi tapılmadı" }, { status: 404 });
 
   let groupName: string | null = null;
   if (groupId) {
@@ -47,12 +58,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const updates: Record<string, unknown> = { name, email, groupId: groupId ?? null, groupName };
-  if (role) updates.role = role;
+  // Teachers cannot change a student's role
+  if (role && session.user.role !== "teacher") updates.role = role;
   if (newPassword) updates.password = await bcrypt.hash(newPassword, 12);
 
   await db.update(users).set(updates).where(eq(users.id, id));
 
-  if (existing.groupId !== (groupId ?? null)) {
+  if (target.groupId !== (groupId ?? null)) {
     await db.delete(examSessions).where(and(eq(examSessions.userId, id), eq(examSessions.status, "in_progress")));
   }
 
@@ -63,10 +75,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireAdmin();
+  const session = await requireUserEditor();
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
+  const { target, forbidden } = await getTargetAndCheckOwnership(id, session);
+  if (forbidden) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!target) return NextResponse.json({ error: "İstifadəçi tapılmadı" }, { status: 404 });
+
   let reason: string | null = null;
   try {
     const body = await req.json();
@@ -77,11 +93,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: "Silmə səbəbi tələb olunur" }, { status: 400 });
   }
 
-  const [target] = await db.select({ email: users.email }).from(users).where(eq(users.id, id)).limit(1);
-
   await db.update(users).set({ deletedAt: new Date(), deletionReason: reason.trim() }).where(eq(users.id, id));
 
-  await logActivity({ actorId: session.user.id, actorEmail: session.user.email, action: "user.delete", targetType: "user", targetId: id, details: { reason, targetEmail: target?.email } });
+  await logActivity({ actorId: session.user.id, actorEmail: session.user.email, action: "user.delete", targetType: "user", targetId: id, details: { reason, targetEmail: target.email } });
 
   revalidatePath("/admin/users");
   return NextResponse.json({ success: true });

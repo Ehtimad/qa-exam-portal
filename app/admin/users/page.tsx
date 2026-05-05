@@ -134,6 +134,7 @@ export default async function AdminUsersPage({
                   <p className="text-amber-700 text-sm mt-0.5">{pendingCount} tələbə təsdiqini gözləyir</p>
                 )}
               </div>
+              {isTeacher && <CreateUserButton teacherMode />}
             </div>
 
             <div className="flex items-center justify-between">
@@ -165,7 +166,7 @@ export default async function AdminUsersPage({
                     </thead>
                     <tbody>
                       {paginatedStudents.map((student) => (
-                        <UserRow key={student.id} student={student} canApprove={isAdmin || isTeacher} />
+                        <UserRow key={student.id} student={student} canApprove={isAdmin || isTeacher} canBlock={isAdmin} />
                       ))}
                     </tbody>
                   </table>

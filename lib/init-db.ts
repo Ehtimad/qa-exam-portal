@@ -302,6 +302,16 @@ export async function initDatabase() {
     }
   } catch (e) { console.error("[init-db] default teacher migration:", e); }
 
+  // ── Assign existing NULL teacher_id records to admin ─────────────────
+  try {
+    const [adminUser] = await sql`SELECT id FROM users WHERE role = 'admin' LIMIT 1`;
+    if (adminUser) {
+      await sql`UPDATE questions SET teacher_id = ${adminUser.id} WHERE teacher_id IS NULL`;
+      await sql`UPDATE exams SET teacher_id = ${adminUser.id} WHERE teacher_id IS NULL`;
+      await sql`UPDATE materials SET created_by = ${adminUser.id} WHERE created_by IS NULL`;
+    }
+  } catch (e) { console.error("[init-db] assign null teacher_id to admin:", e); }
+
   // ── Seed admin ───────────────────────────────────────────────────────
   const [adminRow] = await sql`SELECT count(*)::int AS c FROM users WHERE role='admin'`;
   if ((adminRow.c as number) === 0) {

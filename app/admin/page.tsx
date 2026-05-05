@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, examAttempts } from "@/lib/schema";
-import { eq, count, sql } from "drizzle-orm";
+import { eq, count, sql, and } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isStaff } from "@/lib/rbac";
@@ -10,15 +10,22 @@ export default async function AdminPage() {
   const session = await auth();
   if (!session || !isStaff(session.user.role)) redirect("/dashboard");
 
+  const isTeacher = session.user.role === "teacher";
+
   const [totalStudents] = await db
     .select({ count: count() })
     .from(users)
-    .where(eq(users.role, "student"));
-
+    .where(
+      isTeacher
+        ? and(eq(users.role, "student"), eq(users.teacherId, session.user.id))
+        : eq(users.role, "student")
+    );
 
   const [totalAttempts] = await db
     .select({ count: count() })
-    .from(examAttempts);
+    .from(examAttempts)
+    .leftJoin(users, eq(examAttempts.userId, users.id))
+    .where(isTeacher ? eq(users.teacherId, session.user.id) : undefined);
 
   const recentAttempts = await db
     .select({
@@ -32,17 +39,22 @@ export default async function AdminPage() {
     })
     .from(examAttempts)
     .leftJoin(users, eq(examAttempts.userId, users.id))
+    .where(isTeacher ? eq(users.teacherId, session.user.id) : undefined)
     .orderBy(sql`${examAttempts.completedAt} DESC`)
     .limit(5);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        {isTeacher ? "Müəllim Paneli" : "Admin Dashboard"}
+      </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="card text-center">
           <div className="text-3xl font-bold text-blue-600">{totalStudents.count}</div>
-          <div className="text-gray-500 text-sm mt-1">Ümumi tələbə</div>
+          <div className="text-gray-500 text-sm mt-1">
+            {isTeacher ? "Öz tələbələrim" : "Ümumi tələbə"}
+          </div>
         </div>
         <div className="card text-center">
           <div className="text-3xl font-bold text-blue-600">
